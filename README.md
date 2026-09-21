@@ -1,4 +1,4 @@
-# Speckit App
+# Courses App
 
 Spec-Driven Development (SDD) starter kit — **empty product shell**.
 

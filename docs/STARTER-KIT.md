@@ -106,16 +106,16 @@ git checkout -b dev
 
 | File | Default `name` | Change to |
 |------|----------------|-----------|
-| `package.json` (root) | `speckit-app` | e.g. `myapp-speckit` |
-| `frontend/package.json` | `speckit-app-frontend` | e.g. `myapp-frontend` |
-| `backend/package.json` | `speckit-app-backend` | e.g. `myapp-backend` |
+| `package.json` (root) | `courses-speckit` | e.g. `myapp-speckit` |
+| `frontend/package.json` | `courses-speckit-frontend` | e.g. `myapp-frontend` |
+| `backend/package.json` | `courses-speckit-backend` | e.g. `myapp-backend` |
 
 Then do a **project-wide search-and-replace** for these placeholder strings across the unzipped tree (IDE find-in-files or `rg`). You are not rewriting every file — only files that contain the string will change; most rules and framework docs will not.
 
 | Placeholder | Replace with | Typical hits |
 |-------------|--------------|--------------|
-| `Speckit App` | Your display name | `README.md`, `Home.vue`, `server.js` log line, Agility examples |
-| `speckit-db` | Your MySQL database name | `.env.example`, `.env.test.example`, `db.config.js` |
+| `Courses App` | Your display name | `README.md`, `Home.vue`, `server.js` log line, Agility examples |
+| `courses-db` | Your MySQL database name | `.env.example`, `.env.test.example`, `db.config.js` |
 | `/api/` | Your API mount path (if different) | `backend/server.js`, `frontend/src/services/services.js` |
 | Ports `8082` / `3200` | Only if you must change them | Vite config, Express `PORT`, CORS origin |
 

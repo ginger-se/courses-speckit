@@ -1,8 +1,8 @@
 {
-  "name": "speckit-app-backend",
+  "name": "courses-speckit-backend",
   "version": "1.0.0",
   "type": "module",
-  "description": "Speckit App — Node.js REST API",
+  "description": "Courses App — Node.js REST API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
