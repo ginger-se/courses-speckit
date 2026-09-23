@@ -2,7 +2,7 @@
 
 **Feature ID:** 4
 **Branch pattern:** `feature/4-faculty-management`
-**Status:** Draft
+**Status:** Ready
 **Created:** 2026-09-22
 **Input:** Signed-in admin users manage faculty via dialogs opened from faculty rows (add, edit, delete); new faculty are added via a dialog
 **Depends on:** [Feature 1 — User Authentication](feature-1-user-auth.md)
