@@ -33,7 +33,7 @@
 
 ### US-3.3: Search/filter/paginate courses
 
-**As a** signed-in admin user  
+**As a** signed-in user  
 **I want to** search/filter/paginate the list of courses
 **So that** I can find the courses I am looking for
 
@@ -108,8 +108,9 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 | Method   | Endpoint             | Auth        | Purpose             |
 | -------- | -------------------- | ----------- | ------------------- |
 | `GET`    | `/courses`           | Yes         | Fetch all courses   |
+| `GET`    | `/courses/:courseId` | Yes         | Fetch a single      |
 | `POST`   | `/courses`           | Yes - Admin | Create a new course |
-| `PUT`    | `/courses`           | Yes - Admin | Edit a course       |
+| `PUT`    | `/courses/:courseId` | Yes - Admin | Edit a course       |
 | `DELETE` | `/courses/:courseId` | Yes - Admin | Delete course       |
 
 **Create course request body:**
@@ -126,7 +127,7 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 }
 ```
 
-**List success response** (`200` / `201`):
+**Course success response** (`200` / `201`):
 
 ```json
 {
@@ -182,18 +183,18 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 
 ### `courses` table
 
-| Field         | Type       | Rules                                           |
-| ------------- | ---------- | ----------------------------------------------- |
-| `id`          | INTEGER PK | Auto-increment                                  |
-| `name`        | STRING     | Required; max 255 chars                         |
-| `number`      | STRING     | Required; (XXXX-####)                           |
-| `description` | STRING     | Required                                        |
-| `semester`    | STRING     | Required; ["fall", "winter", "spring", "summer" |
-| `frequency`   | STRING     | Required; ["yearly", "even", "odd"              |
-| `hours`       | INTEGER    | Required; multiple of 0.5                       |
-| `deparmtment` | INTEGER    | Required; max 100 chars                         |
-| `createdAt`   | DATE       | Sequelize timestamps                            |
-| `updatedAt`   | DATE       | Sequelize timestamps                            |
+| Field         | Type       | Rules                                            |
+| ------------- | ---------- | ------------------------------------------------ |
+| `id`          | INTEGER PK | Auto-increment                                   |
+| `name`        | STRING     | Required; max 255 chars                          |
+| `number`      | STRING     | Required; (XXXX-####)                            |
+| `description` | STRING     | Required                                         |
+| `semester`    | STRING     | Required; ["fall", "winter", "spring", "summer"] |
+| `frequency`   | STRING     | Required; ["yearly", "even", "odd"]              |
+| `hours`       | INTEGER    | Required; multiple of 0.5                        |
+| `deparmtment` | INTEGER    | Required; max 100 chars                          |
+| `createdAt`   | DATE       | Sequelize timestamps                             |
+| `updatedAt`   | DATE       | Sequelize timestamps                             |
 
 ### Associations (in `models/index.js`)
 
@@ -209,8 +210,7 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 
 - **Given** I am signed in as an admin
 - **When** I click **+ New Course**
-- **And** I fill out the form for `Programming II` (`COMP-2100`)
-- **And** I confirm the dialog
+- **And** I fill out the form for `Programming II` (`COMP-2100`) and submit
 - **Then** the API returns `201` with a course object containing `id` and course details
 - **And** `COMP-2100` appears in the courses view ordered alphabetically
 - **And** the add-course dialog closes
@@ -218,9 +218,7 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 #### Scenario: User creates a course with an empty required field
 
 - **Given** I am signed in as an admin
-- **When** I open the new course dialog
-- **And** I leave the `courseName` field empty
-- **And** I attempt to confirm
+- **When** I open the new course dialog and I leave the `courseName` field empty and submit
 - **Then** inline validation blocks the request
 - **And** I see a required field validation message
 - **And** no API request is sent
@@ -300,17 +298,14 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 - **Given** I am signed in as an admin
 - **And** a course named `Programming I` exists
 - **When** I click the edit icon on the `Programming I` row
-- **And** I change the semester to `winter` in the rename dialog
-- **And** I confirm
+- **And** I change the semester to `winter` in the rename dialog and submit
 - **Then** the API returns `200` with the updated course object
 - **And** the courses view reflects the updated semester
 
 #### Scenario: Admin deletes a course
 
-- **Given** I am signed in as an admin
-- **And** a course exists
-- **When** I click the delete icon on the course row
-- **And** I confirm the delete dialog
+- **Given** I am signed in as an admin a course exists
+- **When** I click the delete icon on the course row and submit
 - **Then** the API returns `200` or `204`
 - **And** the course is removed from the courses view
 
