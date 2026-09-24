@@ -110,13 +110,7 @@ Only signed-in admin users should be able to manage sections. Other signed-in us
   "endTime": "15:30:00",
 }
 ```
-sectionNumber
-• semesterId
-• courseId
-• facultyId
-• daysOfWeek
-• startTime
-• endTime
+
 **Section success response** (`200` / `201`):
 
 ```json
