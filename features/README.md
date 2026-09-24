@@ -16,7 +16,7 @@ No application code may be written unless it maps to a requirement in one of the
 
 | ID | File | Branch | Depends on |
 |----|------|--------|------------|
-| — | *Add `feature-1-….md` before implementation* | `feature/1-…` | — |
+| 7 | [feature-7-course-listing.md](./feature-7-course-listing.md) | `feature/7-course-listing` | Feature 1 (auth), Feature 2 (semesters), Feature 3 (courses), Feature 5 (sections), Feature 6 (enrollments) |
 
 New features: follow [framework.md](./framework.md#feature-spec-template) — **Status**, **Input**, **FR-00N**, **SC-00N**, **Key Entities**, Gherkin, **Agent implementation request**, **Definition of Done**.
 
