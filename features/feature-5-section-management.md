@@ -1,9 +1,9 @@
 # Feature: Section Management
 
-**Feature ID:** 3
-**Branch pattern:** `feature/3-section-management`
-**Status:** Draft
-**Created:** 2026-09-21
+**Feature ID:** 5
+**Branch pattern:** `feature/5-section-management`
+**Status:** Done
+**Created:** 2026-09-23
 **Input:** Signed-in admin users manage sections. Sections are added/edited with a dialog
 **Depends on:** Feature 4
 
