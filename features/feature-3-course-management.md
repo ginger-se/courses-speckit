@@ -73,8 +73,8 @@
 - **FR-004**: This feature MUST deliver course CRUD and a **single-view** courses UI in `Courses.vue` (dialog-based add/edit/delete). No sidebar/main split.
 - **FR-005**: `courseNumber` MUST be in the format of XXXX-#### (ex. COMP-2100)
 - **FR-006**: `courseName` MUST be no longer than 255 characters
-- **FR-007**: `courseFrequency` MUST be one of `yearly`, `odd`, `even`
-- **FR-008**: `courseSemester` MUST be one of `fall`, `winter`, `spring`, `summer`
+- **FR-007**: `courseFrequency` MUST be one of `Yearly`, `Odd Years`, `Even Years`
+- **FR-008**: `courseSemester` MUST be one or more of ["Fall", "Winter", "Spring", "Summer"]
 - **FR-009**: `courseHours` MUST be a multiple of `0.5`
 
 ---
@@ -120,8 +120,8 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
   "courseNumber": "COMP-2100",
   "courseName": "Programming II",
   "courseDescription": "Magna tempor ipsum reprehenderit nostrud laboris eu non Lorem. Ipsum est pariatur ut officia excepteur non laboris.",
-  "courseSemester": "fall",
-  "courseFrequency": "yearly",
+  "courseSemester": "Fall",
+  "courseFrequency": "Yearly",
   "courseHours": 3,
   "courseDept": "Computer Science"
 }
@@ -135,8 +135,8 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
   "courseNumber": "COMP-2100",
   "courseName": "Programming II",
   "courseDescription": "Magna tempor ipsum reprehenderit nostrud laboris eu non Lorem. Ipsum est pariatur ut officia excepteur non laboris.",
-  "courseSemester": "fall",
-  "courseFrequency": "yearly",
+  "courseSemester": "Fall",
+  "courseFrequency": "Yearly",
   "courseHours": 3,
   "courseDept": "Computer Science",
   "createdAt": "2026-07-02T12:00:00.000Z",
@@ -189,8 +189,8 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 | `name`        | STRING     | Required; max 255 chars                          |
 | `number`      | STRING     | Required; (XXXX-####)                            |
 | `description` | STRING     | Required                                         |
-| `semester`    | STRING     | Required; ["fall", "winter", "spring", "summer"] |
-| `frequency`   | STRING     | Required; ["yearly", "even", "odd"]              |
+| `semester`    | STRING     | Required; ["Fall", "Winter", "Spring", "Summer"] |
+| `frequency`   | STRING     | Required; ["Yearly", "Even Years", "Odd Years"]  |
 | `hours`       | INTEGER    | Required; multiple of 0.5                        |
 | `deparmtment` | INTEGER    | Required; max 100 chars                          |
 | `createdAt`   | DATE       | Sequelize timestamps                             |
@@ -206,67 +206,57 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 
 ### US-3.1 — Create courses
 
-#### Scenario: Admin user creates a new course
+#### Scenario: Admin creates course
 
 - **Given** I am signed in as an admin
-- **When** I click **+ New Course**
-- **And** I fill out the form for `Programming II` (`COMP-2100`) and submit
-- **Then** the API returns `201` with a course object containing `id` and course details
-- **And** `COMP-2100` appears in the courses view ordered alphabetically
-- **And** the add-course dialog closes
+- **When** I click **+ New Course** and fill out the form for `Programming II` (`COMP-2100`) and submit
+- **Then** the API returns `201` with a course object `COMP-2100` appears in the courses view ordered alphabetically
 
-#### Scenario: User creates a course with an empty required field
+#### Scenario: User creates course with missing fields
 
 - **Given** I am signed in as an admin
 - **When** I open the new course dialog and I leave the `courseName` field empty and submit
-- **Then** inline validation blocks the request
-- **And** I see a required field validation message
-- **And** no API request is sent
+- **Then** inline validation blocks the request I see a required field validation message
 
-#### Scenario: User creates a course with invalid formatted fields
+#### Scenario: User creates a course with invalid fields
 
 - **Given** I am signed in as an admin
 - **When** I enter a course number formatted as `CS210` instead of `XXXX-####`
-- **Then** the API returns `400` with an invalid format message
-- **And** the error is displayed in a `<v-alert type="error">`
+- **Then** the API returns `400` with an invalid format message and an error is displayed
 
 ---
 
 ### US-3.2 — View courses
 
-#### Scenario: Courses view loads with existing courses
+#### Scenario: Courses view lists courses
 
-- **Given** I am signed in
-- **And** courses exist in the system
+- **Given** I am signed in courses exist in the system
 - **When** I navigate to the courses view
-- **Then** the courses appear in the view
-- **And** they are sorted alphabetically by `courseNumber`
+- **Then** the courses appear in the view they are sorted alphabetically by `courseNumber`
 
-#### Scenario: User has no courses available
+#### Scenario: Courses empty state
 
-- **Given** I am signed in
-- **And** there are no courses in the database
+- **Given** I am signed in and there are no courses in the database
 - **When** I navigate to the courses view
 - **Then** I see **"No courses yet. Create your first course."**
 
-#### Scenario: Non-admin user views courses
+#### Scenario: Non-admin does not see admin buttons
 
-- **Given** I am signed in as a standard user
+- **Given** I am signed in as a non-admin user
 - **When** I navigate to the courses view
-- **Then** I see the list of courses
-- **And** I do not see the **+ New Course** button
+- **Then** I see the list of courses I do not see the **+ New Course** button or row actions
 
 ---
 
 ### US-3.3 — Search/filter/paginate courses
 
-#### Scenario: Admin searches for a specific course
+#### Scenario: Users can search courses
 
 - **Given** I am viewing the courses list
 - **When** I type `COMP-` into the search field
 - **Then** the view updates to show only courses containing `COMP-` in the name or number
 
-#### Scenario: Admin paginates through courses
+#### Scenario: Courses list paginates
 
 - **Given** there are more than one page of courses
 - **When** I click the next page button
@@ -280,12 +270,11 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 
 - **Given** I am signed in as an admin
 - **When** I view the courses view
-- **Then** each course row shows an **Edit course** icon action
-- **And** each course row shows a **Delete course** icon action
+- **Then** each course row shows an **Edit course** icon action each course row shows a **Delete course** icon action
 
 #### Scenario: Course rows do not show edit/delete actions for non-admins
 
-- **Given** I am signed in as a standard user
+- **Given** I am signed in as a non-admin user
 - **When** I view the courses view
 - **Then** the **Edit course** and **Delete course** icons are not visible
 
@@ -295,26 +284,21 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 
 #### Scenario: Admin edits a course
 
-- **Given** I am signed in as an admin
-- **And** a course named `Programming I` exists
-- **When** I click the edit icon on the `Programming I` row
-- **And** I change the semester to `winter` in the rename dialog and submit
-- **Then** the API returns `200` with the updated course object
-- **And** the courses view reflects the updated semester
+- **Given** I am signed in as an admin a course named `Programming I` exists
+- **When** I click the edit icon on the `Programming I` row I change the semester to `Winter` in the edit dialog and submit
+- **Then** the API returns `200` with the updated course object the courses view reflects the updated semester
 
 #### Scenario: Admin deletes a course
 
 - **Given** I am signed in as an admin a course exists
 - **When** I click the delete icon on the course row and submit
-- **Then** the API returns `200` or `204`
-- **And** the course is removed from the courses view
+- **Then** the API returns `200` or `204` and the course is removed from the courses view
 
 #### Scenario: Non-admin attempts to edit or delete a course via API
 
 - **Given** I am signed in as a standard user
 - **When** I send `DELETE /courses/:courseId` or `PUT /courses/:courseId`
-- **Then** the API returns `401` or `404` depending on standard router rejection
-- **And** the database is unchanged
+- **Then** the API returns `401` or `404`
 
 #### Scenario: Unauthenticated API request to courses
 
