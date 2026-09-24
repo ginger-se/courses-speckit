@@ -57,7 +57,7 @@ Already fulfilled by earlier features.
 
 ### [View: SectionStudent] — route name `sectionstudents`
 
-**Single Vue view** (`Courses.vue`) — no sidebar / main-panel split.
+**Single Vue view** (`SectionStudents.vue`) — no sidebar / main-panel split.
 
 **Section Students view (this feature)**
 
@@ -66,7 +66,7 @@ Already fulfilled by earlier features.
 - **Empty state:** **"No students have enrolled in this course yet."** when there are no students enrolled in the section.
 - **Loading state:** skeleton or progress indicator while courses are fetching.
 - **Error state:** `<v-alert type="error">` for API failures.
-- **Pagination:** courses are paginated when there are more than 20 rows
+- **Pagination:** student rows are paginated when there are more than 20 rows
 
 
 ---
