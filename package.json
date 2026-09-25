@@ -3,6 +3,7 @@
   "private": true,
   "description": "Spec-driven app — monorepo root (deploy scripts orchestrate frontend/ and backend/)",
   "scripts": {
+    "dev": "concurrently -n frontend,backend -c blue,green \"npm run dev --prefix frontend\" \"npm start --prefix backend\"",
     "build:frontend": "npm run build --prefix frontend",
     "bundle:frontend": "npm run bundle --prefix frontend",
     "bundle:backend": "npm run bundle --prefix backend",
@@ -23,6 +24,7 @@
     "agility:verify": "node scripts/push-agility-api.mjs --verify"
   },
   "devDependencies": {
+    "concurrently": "^10.0.5",
     "md-mermaid-pdf": "^0.1.7"
   }
 }
