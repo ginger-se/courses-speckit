@@ -38,7 +38,7 @@
 **So that** I can find the courses I am looking for
 
 **Priority:** P2  
-**Independent test:** Courses view has search/filter/pagination functionality  
+**Independent test:** Courses view has search, filter, sort, and pagination controls; each change re-queries `GET /courses` and the list updates  
 **Acceptance scenarios:** see ### US-3.3 under Acceptance Criteria
 
 ### US-3.4: Manage course cards
@@ -69,13 +69,15 @@
 
 - **FR-001**: All course endpoints MUST require a valid session (`authenticate` middleware).
 - **FR-002**: All course fields MUST be trimmed before save; empty strings MUST be rejected.
-- **FR-003**: Courses MUST be ordered alphabetically by `number` in API responses.
+- **FR-003**: Courses MUST be ordered alphabetically by `number` in API responses unless a different `sort` is requested.
 - **FR-004**: This feature MUST deliver course CRUD and a **single-view** courses UI in `Courses.vue` (dialog-based add/edit/delete). No sidebar/main split.
 - **FR-005**: `number` MUST be in the format of XXXX-#### (ex. COMP-2100)
 - **FR-006**: `name` MUST be no longer than 255 characters
 - **FR-007**: `frequency` MUST be one of `Yearly`, `Odd Years`, `Even Years`
 - **FR-008**: `semesters` MUST be one or more of ["Fall", "Winter", "Spring", "Summer"]
-- **FR-009**: `hours` MUST be an integer
+- **FR-009**: `hours` MUST be an integer >= 1
+- **FR-010**: Search, filtering, sorting, and pagination MUST be performed **server-side** by `GET /courses`.
+- **FR-011**: `department` MUST be one of ["Computer Science", "Engineering", "English", "Business", "Art", "History"].
 
 ---
 
@@ -88,6 +90,8 @@
 - Empty or whitespace-only course name → client block and/or `400`.
 - Course name longer than 255 characters → `400`.
 - Unauthenticated courses screen or `GET /courses` → redirect or `401`.
+- `GET /courses?department=Underwater Basket Weaving` (or an invalid `semester` / `frequency` / `sort`) → `400`.
+- Filters/search active and zero results gives **"No courses match those search terms."** (not the "No courses yet" empty state).
 
 ## Success Criteria
 
@@ -105,13 +109,52 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 
 ## API Requirements
 
-| Method   | Endpoint       | Auth        | Purpose             |
-| -------- | -------------- | ----------- | ------------------- |
-| `GET`    | `/courses`     | Yes         | Fetch all courses   |
-| `GET`    | `/courses/:id` | Yes         | Fetch a single      |
-| `POST`   | `/courses`     | Yes - Admin | Create a new course |
-| `PUT`    | `/courses/:id` | Yes - Admin | Edit a course       |
-| `DELETE` | `/courses/:id` | Yes - Admin | Delete course       |
+| Method   | Endpoint       | Auth        | Purpose                             |
+| -------- | -------------- | ----------- | ----------------------------------- |
+| `GET`    | `/courses`     | Yes         | Search/filter/sort/paginate courses |
+| `GET`    | `/courses/:id` | Yes         | Fetch a single course               |
+| `POST`   | `/courses`     | Yes - Admin | Create a new course                 |
+| `PUT`    | `/courses/:id` | Yes - Admin | Edit a course                       |
+| `DELETE` | `/courses/:id` | Yes - Admin | Delete course                       |
+
+**List courses query parameters** (all optional, see FR-011):
+
+| Param        | Example                    | Default  | Notes                                               |
+| ------------ | -------------------------- | -------- | --------------------------------------------------- |
+| `q`          | `COMP- intro`              | —        | All words must match; case-insensitive              |
+| `department` | `Computer Science,English` | —        | Comma-separated or repeated; OR within param        |
+| `semester`   | `Fall,Spring`              | —        | Matches courses offered in any listed semester      |
+| `frequency`  | `Yearly`                   | —        | Comma-separated or repeated                         |
+| `sort`       | `-hours`                   | `number` | `number`, `name`, `hours`, `department`; `-` = desc |
+| `page`       | `2`                        | `1`      | starts at 1                                         |
+| `pageSize`   | `20`                       | `20`     | Max 100                                             |
+
+**List courses success response** (`200`):
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "number": "COMP-2100",
+      "name": "Programming II",
+      "description": "Magna tempor ipsum reprehenderit nostrud laboris eu non Lorem.",
+      "semesters": ["Fall"],
+      "frequency": "Yearly",
+      "hours": 3,
+      "department": "Computer Science",
+      "createdAt": "2026-07-02T12:00:00.000Z",
+      "updatedAt": "2026-07-02T12:00:00.000Z"
+    }
+  ],
+  "total": 41,
+  "page": 1,
+  "pageSize": 20,
+  "pageCount": 3
+}
+```
+
+`total` is the number of courses matching the search/filters across all pages. `pageCount` is `ceil(total / pageSize)` (`0` when nothing matches).
 
 **Create course request body:**
 
@@ -159,16 +202,20 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 
 - Heading: **Courses**
 - Primary action: **+ New Course** opens a `<v-dialog>` with a name `<v-text-field>` and **Create** / **Cancel**. Use class `oc-cta` on **Create** and **+ New List** (per [ui-style-system.mdc](../../.cursor/rules/ui-style-system.mdc)).
-- Secondary action: **Search** input field
+- Secondary actions (toolbar row above the cards):
+  - **Search** `<v-text-field>`. Input is debounced
+  - **Department**, **Semester**, **Frequency** multi-select `<v-select>`s
+  - **Sort by** `<v-select>`: Number (default), Name, Hours, Department.
 - Display courses as a vertical stack of `<v-card>`s, one per course (no table). Each card shows the **course name** (title), **department** and **course number** (subtitle), **description**, and chips for **hours**, **frequency**, and each **semester**.
 - For admins, each card header has an icon-only overflow button (`mdi-dots-vertical`, `aria-label="Course actions"`) that opens a `<v-menu>` with:
   - **Edit** — opens the course `<v-dialog>` pre-filled with current data; **Save** / **Cancel**
   - **Delete** — opens confirmation `<v-dialog>`
 - Non-admins do not see the **Course actions** button.
-- **Empty state:** **"No courses yet. Create your first course."** when there are no courses.
-- **Loading state:** skeleton or progress indicator while courses are fetching.
+- **Empty state:** **"No courses yet. Create your first course."** when there are no courses and no search/filters are active.
+- **No-results state:** **"No courses match those search terms."** when search/filters are active and `total` is `0`.
+- **Loading state:** progress indicator while courses are fetching, in a fixed-height slot so the list doesn't shift.
 - **Error state:** `<v-alert type="error">` for API failures.
-- **Pagination:** courses are paginated when there are more than 20 courses (20 cards per page)
+- **Pagination:** the view requests `pageSize=20`. A `<v-pagination>` (length = `pageCount`) appears when `pageCount > 1`. Changing page re-fetches that page from the API. After a create/edit/delete, if the current page is past the new `pageCount`, the view moves to the last valid page.
 
 **Implementation note:** one route/view for courses; courses CRUD dialogs are child components or inline `<v-dialog>` blocks in `Courses.vue`.
 
@@ -192,7 +239,7 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 | `description` | STRING     | Required                                        |
 | `semesters`   | STRING     | Required;                                       |
 | `frequency`   | STRING     | Required; ["Yearly", "Even Years", "Odd Years"] |
-| `hours`       | INTEGER    | Required; integer                               |
+| `hours`       | INTEGER    | Required; integer >= 1                          |
 | `department`  | STRING     | Required                                        |
 | `createdAt`   | DATE       | Sequelize timestamps                            |
 | `updatedAt`   | DATE       | Sequelize timestamps                            |
@@ -255,13 +302,43 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 
 - **Given** I am viewing the courses list
 - **When** I type `COMP-` into the search field
-- **Then** the view updates to show only courses containing `COMP-` in the name or number
+- **Then** the view requests `GET /courses?q=COMP-&page=1` and shows only the courses the API returns, i.e. courses containing `COMP-` in the name, number, department, description, or semesters
+
+#### Scenario: Multi-word search matches every word
+
+- **Given** course `Programming II` (`COMP-2100`) exists
+- **When** I request `GET /courses?q=programming 2100`
+- **Then** the API returns `COMP-2100`
+
+#### Scenario: Users filter courses
+
+- **Given** courses exist across several departments, semesters, and frequencies
+- **When** I select one or more values in the **Department**, **Semester**, or **Frequency** filters
+- **Then** the view re-queries `GET /courses` with those filters from page 1, and only matching courses are shown
+
+#### Scenario: Users sort courses
+
+- **Given** courses exist with different hours
+- **When** I request `GET /courses?sort=-hours`
+- **Then** the API returns courses ordered by `hours` descending
+
+#### Scenario: Invalid filter or sort values are rejected
+
+- **Given** I am signed in
+- **When** I request `GET /courses` with an unknown `department`, `semester`, `frequency`, or `sort` value
+- **Then** the API returns `400`
+
+#### Scenario: Search with no matches
+
+- **Given** I am viewing the courses list
+- **When** my search/filters match no courses
+- **Then** I see **"No courses match those search terms."**
 
 #### Scenario: Courses list paginates
 
-- **Given** there are more than one page of courses
+- **Given** there is more than one page of courses
 - **When** I click the next page button
-- **Then** the view updates to show the next set of results
+- **Then** the view requests `GET /courses?page=2` and shows the next set of results
 
 ---
 
@@ -299,7 +376,7 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 
 - **Given** I am signed in as a standard user
 - **When** I send `DELETE /courses/:courseId` or `PUT /courses/:courseId`
-- **Then** the API returns `401` or `404`
+- **Then** the API returns `403` with `{ "message": "Not Authorized." }`
 
 #### Scenario: Unauthenticated API request to courses
 
@@ -319,8 +396,13 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 | US-3.2 | Courses view loads with existing courses                    | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Courses view loads with existing courses`                    |
 | US-3.2 | User has no courses available                               | `frontend/tests/Courses.test.js`                                  | `User has no courses available`                               |
 | US-3.2 | Non-admin user views courses                                | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Non-admin user views courses`                                |
-| US-3.3 | Admin searches for a specific course                        | `frontend/tests/Courses.test.js`                                  | `Admin searches for a specific course`                        |
-| US-3.3 | Admin paginates through courses                             | `frontend/tests/Courses.test.js`                                  | `Admin paginates through courses`                             |
+| US-3.3 | Admin searches for a specific course                        | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Admin searches for a specific course`                        |
+| US-3.3 | Multi-word search matches every word                        | `backend/tests/courses.test.js`                                   | `Multi-word search matches every word`                        |
+| US-3.3 | Users filter courses                                        | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Users filter courses`                                        |
+| US-3.3 | Users sort courses                                          | `backend/tests/courses.test.js`                                   | `Users sort courses`                                          |
+| US-3.3 | Invalid filter or sort values are rejected                  | `backend/tests/courses.test.js`                                   | `Invalid filter or sort values are rejected`                  |
+| US-3.3 | Search with no matches                                      | `frontend/tests/Courses.test.js`                                  | `Search with no matches`                                      |
+| US-3.3 | Admin paginates through courses                             | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Admin paginates through courses`                             |
 | US-3.4 | Course cards show edit and delete actions for admins        | `frontend/tests/Courses.test.js`                                  | `Course cards show edit and delete actions for admins`        |
 | US-3.4 | Course cards do not show edit/delete actions for non-admins | `frontend/tests/Courses.test.js`                                  | `Course cards do not show edit/delete actions for non-admins` |
 | US-3.5 | Admin edits a course                                        | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Admin edits a course`                                        |

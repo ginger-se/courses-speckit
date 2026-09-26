@@ -1,6 +1,8 @@
 <script setup>
 import { ref } from "vue";
-import { DEPARTMENTS, SEMESTERS, FREQUENCIES } from "../../utils/constants";
+import { DEPARTMENTS, SEMESTERS, FREQUENCIES } from "@shared/constants.js";
+import { zodRule } from "../../utils/zodRule";
+import { courseSchema } from "@shared/schemas/course";
 
 const props = defineProps({
   modelValue: { type: Object, required: true },
@@ -13,31 +15,6 @@ const formRef = ref(null);
 const updateField = (field, value) => {
   emit("update:modelValue", { ...props.modelValue, [field]: value });
 };
-
-const nameRules = [
-  (value) => !!value?.trim() || "Required",
-  (value) => (value?.trim().length ?? 0) <= 255 || "Name must be 255 characters or fewer.",
-];
-const numberRules = [
-  (v) => !!v || "Course number is required",
-  (v) => /^[A-Z]{4}-\d{4}$/.test(v) || "Number must be in the format XXXX-#### (ex. COMP-1234)",
-];
-const departmentRules = [
-  (value) => !!value || "Required",
-  (value) => DEPARTMENTS.includes(value) || `Course department must be one of ${DEPARTMENTS.join(", ")}.`,
-];
-const semestersRules = [
-  (value) => !!value || "Required",
-  (value) =>
-    value.every((semester) => SEMESTERS.includes(semester)) ||
-    `Semesters offered must be one or more of ${SEMESTERS.join(", ")}.`,
-];
-const descriptionRules = [(v) => !!v || "Description is required"];
-const frequencyRules = [
-  (v) => !!v || "Frequency is required",
-  (value) => FREQUENCIES.includes(value) || `Frequency must be one of ${FREQUENCIES.join(", ")}.`,
-];
-const hoursRules = [(v) => !v || Number.isInteger(Number(v)) || "Value must be an integer"];
 
 const validate = () => formRef.value.validate();
 
@@ -52,7 +29,7 @@ defineExpose({ validate });
           :model-value="modelValue.name"
           label="Name"
           density="comfortable"
-          :rules="nameRules"
+          :rules="[zodRule(courseSchema.shape.name)]"
           @update:model-value="updateField('name', $event)"
         />
       </v-col>
@@ -61,7 +38,7 @@ defineExpose({ validate });
           :model-value="modelValue.number"
           label="Number"
           density="comfortable"
-          :rules="numberRules"
+          :rules="[zodRule(courseSchema.shape.number)]"
           @update:model-value="updateField('number', $event)"
         />
       </v-col>
@@ -73,7 +50,7 @@ defineExpose({ validate });
           type="number"
           label="Credit Hours"
           density="comfortable"
-          :rules="hoursRules"
+          :rules="[zodRule(courseSchema.shape.hours)]"
           @update:model-value="updateField('hours', $event)"
         />
       </v-col>
@@ -83,7 +60,7 @@ defineExpose({ validate });
           label="Department"
           :items="DEPARTMENTS"
           density="comfortable"
-          :rules="departmentRules"
+          :rules="[zodRule(courseSchema.shape.department)]"
           @update:model-value="updateField('department', $event)"
         />
       </v-col>
@@ -95,7 +72,7 @@ defineExpose({ validate });
           label="Semesters Offered"
           :items="SEMESTERS"
           density="comfortable"
-          :rules="semestersRules"
+          :rules="[zodRule(courseSchema.shape.semesters)]"
           chips
           multiple
           @update:model-value="updateField('semesters', $event)"
@@ -107,7 +84,7 @@ defineExpose({ validate });
           label="Frequency"
           :items="FREQUENCIES"
           density="comfortable"
-          :rules="frequencyRules"
+          :rules="[zodRule(courseSchema.shape.frequency)]"
           @update:model-value="updateField('frequency', $event)"
         />
       </v-col>
@@ -118,7 +95,7 @@ defineExpose({ validate });
           :model-value="modelValue.description"
           label="Description"
           density="comfortable"
-          :rules="descriptionRules"
+          :rules="[zodRule(courseSchema.shape.description)]"
           @update:model-value="updateField('description', $event)"
         />
       </v-col>

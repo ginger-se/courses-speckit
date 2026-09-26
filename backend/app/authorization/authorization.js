@@ -62,7 +62,7 @@ export const authenticateAdmin = async (req, res, next) => {
   };
 
   if (session.user.role !== "admin") {
-    return res.status(401).send({ message: "Admin role required." });
+    return res.status(403).send({ message: "Not Authorized." });
   }
 
   next();

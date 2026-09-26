@@ -26,6 +26,11 @@ let studentToken;
 const createCourse = (overrides = {}, token = adminToken) =>
   request(app).post("/api/courses").set(bearer(token)).send(validCourse(overrides));
 
+const listCourses = (query = {}, token = adminToken) =>
+  request(app).get("/api/courses").query(query).set(bearer(token));
+
+const numbersOf = (response) => response.body.items.map((course) => course.number);
+
 beforeEach(async () => {
   await syncTestDatabase();
   adminToken = (await createUserWithRole("admin", { email: "admin@example.com", firstName: "Ada" })).body.token;
@@ -57,19 +62,19 @@ describe("Feature 3 — Course Management API", () => {
         updatedAt: expect.any(String),
       });
 
-      const list = await request(app).get("/api/courses").set(bearer(adminToken));
-      expect(list.body.map((course) => course.number)).toEqual(["COMP-2100", "MATH-1100"]);
+      const list = await listCourses();
+      expect(numbersOf(list)).toEqual(["COMP-2100", "MATH-1100"]);
     });
 
     it("User creates a course with an empty required field", async () => {
-      for (const field of ["name", "number", "description", "frequency", "hours"]) {
+      for (const field of ["name", "number", "description", "semesters", "frequency", "hours", "department"]) {
         const missing = validCourse();
         delete missing[field];
 
         const response = await request(app).post("/api/courses").set(bearer(adminToken)).send(missing);
 
         expect(response.status).toBe(400);
-        expect(response.body).toEqual({ message: expect.any(String) });
+        expect(response.body).toEqual({ message: expect.stringMatching(new RegExp(field, "i")) });
       }
 
       const whitespace = await createCourse({ name: "   " });
@@ -89,8 +94,17 @@ describe("Feature 3 — Course Management API", () => {
       const badFrequency = await createCourse({ frequency: "Every Other Tuesday" });
       expect(badFrequency.status).toBe(400);
 
-      const fractionalHours = await createCourse({ hours: 2.5 });
-      expect(fractionalHours.status).toBe(400);
+      for (const semesters of ["Fall", [], ["Monsoon"]]) {
+        const response = await createCourse({ semesters });
+        expect(response.status).toBe(400);
+        expect(response.body.message).toMatch(/semester/i);
+      }
+
+      for (const hours of [2.5, 0, -1, "abc"]) {
+        const response = await createCourse({ hours });
+        expect(response.status).toBe(400);
+        expect(response.body.message).toMatch(/hours/i);
+      }
 
       expect(await db.course.count()).toBe(0);
     });
@@ -102,12 +116,13 @@ describe("Feature 3 — Course Management API", () => {
       await createCourse({ name: "Programming II", number: "COMP-2100" });
       await createCourse({ name: "Composition", number: "ENGL-1010", department: "English" });
 
-      const response = await request(app).get("/api/courses").set(bearer(adminToken));
+      const response = await listCourses();
 
       expect(response.status).toBe(200);
-      expect(response.body.map((course) => course.number)).toEqual(["COMP-2100", "ENGL-1010", "MATH-1100"]);
+      expect(response.body).toMatchObject({ total: 3, page: 1, pageSize: 20, pageCount: 1 });
+      expect(numbersOf(response)).toEqual(["COMP-2100", "ENGL-1010", "MATH-1100"]);
 
-      const single = await request(app).get(`/api/courses/${response.body[1].id}`).set(bearer(adminToken));
+      const single = await request(app).get(`/api/courses/${response.body.items[1].id}`).set(bearer(adminToken));
       expect(single.status).toBe(200);
       expect(single.body).toMatchObject({ number: "ENGL-1010", name: "Composition" });
 
@@ -119,14 +134,124 @@ describe("Feature 3 — Course Management API", () => {
     it("Non-admin user views courses", async () => {
       await createCourse();
 
-      const list = await request(app).get("/api/courses").set(bearer(studentToken));
+      const list = await listCourses({}, studentToken);
       expect(list.status).toBe(200);
-      expect(list.body).toHaveLength(1);
-      expect(list.body[0]).toMatchObject({ number: "COMP-2100" });
+      expect(list.body.items).toHaveLength(1);
+      expect(list.body.items[0]).toMatchObject({ number: "COMP-2100" });
 
       const create = await createCourse({ number: "COMP-3100" }, studentToken);
       expect(create.status).not.toBe(201);
       expect(await db.course.count()).toBe(1);
+    });
+  });
+
+  describe("US-3.3 — Search/filter/paginate courses", () => {
+    it("Admin searches for a specific course", async () => {
+      await createCourse({ name: "Programming II", number: "COMP-2100" });
+      await createCourse({ name: "Composition", number: "ENGL-1010", department: "English" });
+      await createCourse({ name: "Calculus I", number: "MATH-1100", department: "Engineering" });
+
+      const byNumber = await listCourses({ q: "COMP-" });
+      expect(byNumber.status).toBe(200);
+      expect(numbersOf(byNumber)).toEqual(["COMP-2100"]);
+      expect(byNumber.body.total).toBe(1);
+
+      const byName = await listCourses({ q: "composition" });
+      expect(numbersOf(byName)).toEqual(["ENGL-1010"]);
+
+      const byDepartment = await listCourses({ q: "engineering" });
+      expect(numbersOf(byDepartment)).toEqual(["MATH-1100"]);
+
+      // LIKE wildcards in the search are matched literally.
+      const wildcard = await listCourses({ q: "%" });
+      expect(wildcard.body.items).toEqual([]);
+    });
+
+    it("Multi-word search matches every word", async () => {
+      await createCourse({ name: "Programming I", number: "COMP-1100" });
+      await createCourse({ name: "Programming II", number: "COMP-2100" });
+
+      const response = await listCourses({ q: "programming 2100" });
+
+      expect(numbersOf(response)).toEqual(["COMP-2100"]);
+    });
+
+    it("Users filter courses", async () => {
+      await createCourse({ number: "COMP-1100", semesters: ["Fall"], frequency: "Yearly" });
+      await createCourse({ number: "COMP-2100", semesters: ["Spring", "Summer"], frequency: "Odd Years" });
+      await createCourse({
+        number: "ENGL-1010",
+        department: "English",
+        semesters: ["Winter"],
+        frequency: "Even Years",
+      });
+
+      const byDepartment = await listCourses({ department: "English" });
+      expect(numbersOf(byDepartment)).toEqual(["ENGL-1010"]);
+
+      const bySemesterList = await listCourses({ semester: "Fall,Summer" });
+      expect(numbersOf(bySemesterList)).toEqual(["COMP-1100", "COMP-2100"]);
+
+      const repeated = await request(app)
+        .get("/api/courses?frequency=Yearly&frequency=Even%20Years")
+        .set(bearer(adminToken));
+      expect(numbersOf(repeated)).toEqual(["COMP-1100", "ENGL-1010"]);
+
+      const combined = await listCourses({ department: "Computer Science", semester: "Spring", q: "COMP" });
+      expect(numbersOf(combined)).toEqual(["COMP-2100"]);
+    });
+
+    it("Users sort courses", async () => {
+      await createCourse({ name: "Beta", number: "COMP-1100", hours: 3 });
+      await createCourse({ name: "Alpha", number: "COMP-2100", hours: 4 });
+      await createCourse({ name: "Gamma", number: "COMP-3100", hours: 3 });
+
+      const byName = await listCourses({ sort: "name" });
+      expect(numbersOf(byName)).toEqual(["COMP-2100", "COMP-1100", "COMP-3100"]);
+
+      // Ties on hours fall back to id order.
+      const byHoursDesc = await listCourses({ sort: "-hours" });
+      expect(numbersOf(byHoursDesc)).toEqual(["COMP-2100", "COMP-1100", "COMP-3100"]);
+    });
+
+    it("Invalid filter or sort values are rejected", async () => {
+      for (const query of [
+        { department: "Underwater Basket Weaving" },
+        { semester: "Monsoon" },
+        { frequency: "Every Other Tuesday" },
+        { sort: "createdAt" },
+      ]) {
+        const response = await listCourses(query);
+        expect(response.status).toBe(400);
+        expect(response.body).toEqual({ message: expect.any(String) });
+      }
+    });
+
+    it("Admin paginates through courses", async () => {
+      for (let i = 1; i <= 25; i += 1) {
+        await createCourse({ name: `Course ${i}`, number: `COMP-${1000 + i}` });
+      }
+
+      const first = await listCourses();
+      expect(first.body).toMatchObject({ total: 25, page: 1, pageSize: 20, pageCount: 2 });
+      expect(first.body.items).toHaveLength(20);
+      expect(first.body.items[0].number).toBe("COMP-1001");
+
+      const second = await listCourses({ page: 2 });
+      expect(second.body).toMatchObject({ total: 25, page: 2, pageCount: 2 });
+      expect(numbersOf(second)).toEqual(["COMP-1021", "COMP-1022", "COMP-1023", "COMP-1024", "COMP-1025"]);
+
+      const small = await listCourses({ page: 3, pageSize: 5 });
+      expect(small.body).toMatchObject({ page: 3, pageSize: 5, pageCount: 5 });
+      expect(numbersOf(small)).toEqual(["COMP-1011", "COMP-1012", "COMP-1013", "COMP-1014", "COMP-1015"]);
+
+      const clamped = await listCourses({ page: 0, pageSize: 1000 });
+      expect(clamped.body).toMatchObject({ page: 1, pageSize: 100, pageCount: 1 });
+      expect(clamped.body.items).toHaveLength(25);
+
+      const pastEnd = await listCourses({ page: 9 });
+      expect(pastEnd.status).toBe(200);
+      expect(pastEnd.body.items).toEqual([]);
     });
   });
 
@@ -149,6 +274,14 @@ describe("Feature 3 — Course Management API", () => {
 
       const stored = await db.course.findByPk(created.id);
       expect(stored.semesters).toEqual(["Winter"]);
+
+      // Edits go through the same validation as creates.
+      const invalid = await request(app)
+        .put(`/api/courses/${created.id}`)
+        .set(bearer(adminToken))
+        .send(validCourse({ number: "COMP-1100", semesters: "Fall" }));
+      expect(invalid.status).toBe(400);
+      expect((await db.course.findByPk(created.id)).semesters).toEqual(["Winter"]);
     });
 
     it("Admin deletes a course", async () => {
@@ -159,8 +292,8 @@ describe("Feature 3 — Course Management API", () => {
       expect([200, 204]).toContain(response.status);
       expect(await db.course.findByPk(created.id)).toBeNull();
 
-      const list = await request(app).get("/api/courses").set(bearer(adminToken));
-      expect(list.body).toEqual([]);
+      const list = await listCourses();
+      expect(list.body).toEqual({ items: [], total: 0, page: 1, pageSize: 20, pageCount: 0 });
     });
 
     it("Non-admin attempts to edit or delete a course via API", async () => {
@@ -170,10 +303,12 @@ describe("Feature 3 — Course Management API", () => {
         .put(`/api/courses/${created.id}`)
         .set(bearer(studentToken))
         .send(validCourse({ name: "Hijacked" }));
-      expect([401, 404]).toContain(update.status);
+      expect(update.status).toBe(403);
+      expect(update.body).toEqual({ message: "Not Authorized." });
 
       const remove = await request(app).delete(`/api/courses/${created.id}`).set(bearer(studentToken));
-      expect([401, 404]).toContain(remove.status);
+      expect(remove.status).toBe(403);
+      expect(remove.body).toEqual({ message: "Not Authorized." });
 
       const stored = await db.course.findByPk(created.id);
       expect(stored.name).toBe("Programming II");

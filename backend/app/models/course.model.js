@@ -7,7 +7,7 @@ export default (sequelize, Sequelize) => {
     number: {
       type: Sequelize.STRING,
       allowNull: false,
-      unique: true,
+      unique: { msg: "Course number is already taken." },
     },
     description: {
       type: Sequelize.TEXT,

@@ -2,8 +2,8 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import authServices from "../services/authServices.js";
-import Utils from "../config/utils.js";
 import { emailRules } from "../config/validation.js";
+import { setUser } from "../composables/useAuth.js";
 
 const router = useRouter();
 const form = ref(null);
@@ -44,8 +44,7 @@ const handleSubmit = async () => {
       password: password.value,
     });
 
-    Utils.setStore("user", response.data);
-    window.dispatchEvent(new CustomEvent("user-logged-in"));
+    setUser(response.data);
     await router.push({ name: "home" });
   } catch (error) {
     errorMessage.value = error.response?.data?.message || "Registration failed.";

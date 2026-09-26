@@ -3,7 +3,8 @@ import { computed, onMounted, ref, reactive, watch } from "vue";
 import courseServices from "../services/courseServices.js";
 import CourseForm from "../components/forms/CourseForm.vue";
 import Utils from "../config/utils.js";
-import { SEMESTERS, DEPARTMENTS, FREQUENCIES } from "../utils/constants.js";
+import { SEMESTERS, DEPARTMENTS, FREQUENCIES } from "@shared/constants.js";
+import { useAuth } from "../composables/useAuth.js";
 
 const SORTABLE = [
   {
@@ -36,7 +37,7 @@ const emptyForm = () => ({
 
 const ITEMS_PER_PAGE = 20;
 
-const user = ref(Utils.getStore("user"));
+const { isAdmin } = useAuth();
 const courses = ref([]);
 const loading = ref(false);
 const listError = ref("");
@@ -50,10 +51,10 @@ const editingId = ref(null);
 const deleteDialogOpen = ref(false);
 const courseToDelete = ref(null);
 const deleting = ref(false);
+const deleteError = ref("");
 
 const formTitle = computed(() => (isAddMode.value ? "Add Course" : "Edit Course"));
 const saveLabel = computed(() => (isAddMode.value ? "Create" : "Save"));
-const isAdmin = computed(() => user.value?.role === "admin");
 
 const filters = reactive({ q: "", department: [], semester: [], frequency: [], sort: "number" });
 const page = ref(1);
@@ -181,6 +182,7 @@ const saveCourse = async () => {
 
 const openDeleteDialog = (course) => {
   courseToDelete.value = course;
+  deleteError.value = "";
   deleteDialogOpen.value = true;
 };
 
@@ -195,14 +197,14 @@ const confirmDeleteCourse = async () => {
   }
 
   deleting.value = true;
-  listError.value = "";
+  deleteError.value = "";
 
   try {
     await courseServices.removeCourse(courseToDelete.value.id);
     closeDeleteDialog();
     await retrieveCourses();
   } catch (error) {
-    listError.value = error.response?.data?.message || "Failed to delete course.";
+    deleteError.value = error.response?.data?.message || "Failed to delete course.";
   } finally {
     deleting.value = false;
   }
@@ -244,7 +246,7 @@ onMounted(retrieveCourses);
           <v-select v-model="filters.frequency" :items="FREQUENCIES" label="Frequency" multiple clearable />
           <v-select v-model="filters.sort" :items="SORTABLE" item-title="label" item-value="value" label="Sort by" />
         </v-row>
-        <v-card v-for="course in courses">
+        <v-card v-for="course in courses" :key="course.id">
           <v-card-item>
             <v-card-title>{{ course.name }}</v-card-title>
 
@@ -292,7 +294,7 @@ onMounted(retrieveCourses);
 
               <v-chip color="blue">{{ course.frequency }}</v-chip>
 
-              <v-chip color="green" v-for="semester in course.semesters">{{ semester }}</v-chip>
+              <v-chip color="green" v-for="semester in course.semesters" :key="semester">{{ semester }}</v-chip>
             </div>
           </div>
         </v-card>
@@ -323,7 +325,10 @@ onMounted(retrieveCourses);
     <v-dialog v-model="deleteDialogOpen" max-width="420">
       <v-card rounded="lg">
         <v-card-title>Delete course</v-card-title>
-        <v-card-text>Delete this course?</v-card-text>
+        <v-card-text>
+          Delete this course?
+          <v-alert v-if="deleteError" type="error" density="compact" class="mt-2">{{ deleteError }}</v-alert>
+        </v-card-text>
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="closeDeleteDialog">Cancel</v-btn>

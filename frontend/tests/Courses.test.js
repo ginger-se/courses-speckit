@@ -37,6 +37,14 @@ const course = (overrides = {}) => ({
   ...overrides,
 });
 
+/** Shape of a `GET /courses` response: one page of items plus pagination metadata. */
+const pageOf = (items, { total = items.length, page = 1, pageSize = 20 } = {}) => ({
+  data: { items, total, page, pageSize, pageCount: Math.ceil(total / pageSize) },
+});
+
+/** Params the view sent on its most recent `GET /courses`. */
+const lastListParams = () => apiClient.get.mock.calls.at(-1)[1].params;
+
 const apiError = (status, message) => Object.assign(new Error(message), { response: { status, data: { message } } });
 
 const settle = async () => {
@@ -63,9 +71,9 @@ const waitFor = async (assertion, timeout = 1500) => {
 
 let wrapper;
 
-const mountCoursesAs = async (user, courses = []) => {
+const mountCoursesAs = async (user, courses = [], pagination = {}) => {
   localStorage.setItem("user", JSON.stringify(user));
-  apiClient.get.mockResolvedValue({ data: courses });
+  apiClient.get.mockResolvedValue(pageOf(courses, pagination));
   await router.push("/");
   await router.isReady();
   wrapper = mount(App, { attachTo: document.body, global: { plugins: [vuetify, router] } });
@@ -125,6 +133,22 @@ const completeCourseForm = {
   Description: "Magna tempor ipsum reprehenderit nostrud laboris eu non Lorem.",
 };
 
+const searchFor = async (value) => {
+  const search = wrapper
+    .findAllComponents(VTextField)
+    .find((f) => /search/i.test(`${f.props("label") ?? ""} ${f.props("placeholder") ?? ""}`));
+  expect(search, "search field").toBeDefined();
+  await search.find("input").setValue(value);
+  await settle();
+};
+
+/** Toolbar filter selects (the course dialog is closed, so its selects aren't rendered). */
+const filterSelect = (label) => {
+  const found = wrapper.findAllComponents(VSelect).find((f) => f.props("label") === label);
+  expect(found, `filter "${label}"`).toBeDefined();
+  return found;
+};
+
 /** Each course card has an overflow button that opens a menu with Edit / Delete. */
 const cardMenus = () => wrapper.findAll('[aria-label="Course actions"]');
 
@@ -168,7 +192,7 @@ describe("Feature 3 — Course Management UI", () => {
       await mountCoursesAs(adminUser, [calculus]);
       const created = course();
       apiClient.post.mockResolvedValueOnce({ data: created });
-      apiClient.get.mockResolvedValue({ data: [created, calculus] });
+      apiClient.get.mockResolvedValue(pageOf([created, calculus]));
 
       const dialog = await openAddDialog();
       await setFields(dialog, completeCourseForm);
@@ -194,11 +218,26 @@ describe("Feature 3 — Course Management UI", () => {
       await mountCoursesAs(adminUser, []);
 
       const dialog = await openAddDialog();
-      await setFields(dialog, { ...completeCourseForm, Name: "   " });
-      await buttonIn(dialog, "Create").trigger("click");
 
-      await waitFor(() => expect(pageText()).toMatch(/required/i));
-      expect(apiClient.post).not.toHaveBeenCalled();
+      // Settle after clicking so the form's validation finishes before the next field changes.
+      const submitExpecting = async (message) => {
+        await buttonIn(dialog, "Create").trigger("click");
+        await settle();
+        await waitFor(() => expect(pageText()).toMatch(message));
+        expect(apiClient.post).not.toHaveBeenCalled();
+      };
+
+      await setFields(dialog, { ...completeCourseForm, Name: "   " });
+      await submitExpecting(/required/i);
+
+      await setFields(dialog, { Name: "Programming II", "Credit Hours": "" });
+      await submitExpecting(/hours must be a whole number/i);
+
+      await setFields(dialog, { "Credit Hours": "3", "Semesters Offered": [] });
+      await submitExpecting(/semesters must include at least one/i);
+
+      await setFields(dialog, { "Semesters Offered": ["Fall"], Description: "   " });
+      await submitExpecting(/description is required/i);
     });
 
     it("User creates a course with invalid formatted fields", async () => {
@@ -222,7 +261,9 @@ describe("Feature 3 — Course Management UI", () => {
         course({ name: "Composition", number: "ENGL-1010", department: "English", frequency: "Odd Years", hours: 4 }),
       ]);
 
-      expect(apiClient.get).toHaveBeenCalledWith("courses");
+      expect(apiClient.get).toHaveBeenCalledWith("courses", {
+        params: expect.objectContaining({ sort: "number", page: 1, pageSize: 20 }),
+      });
       expect(wrapper.find("h1, h2, h3").text()).toBe("Courses");
 
       const text = wrapper.text();
@@ -254,39 +295,67 @@ describe("Feature 3 — Course Management UI", () => {
 
   describe("US-3.3 — Search/filter/paginate courses", () => {
     it("Admin searches for a specific course", async () => {
+      const programming = course({ name: "Programming II", number: "COMP-2100" });
       await mountCoursesAs(adminUser, [
-        course({ name: "Programming II", number: "COMP-2100" }),
+        programming,
         course({ name: "Composition", number: "ENGL-1010", department: "English" }),
         course({ name: "Calculus I", number: "MATH-1100" }),
       ]);
+      apiClient.get.mockResolvedValue(pageOf([programming]));
 
-      const search = wrapper
-        .findAllComponents(VTextField)
-        .find((f) => /search/i.test(`${f.props("label") ?? ""} ${f.props("placeholder") ?? ""}`));
-      expect(search).toBeDefined();
-      await search.find("input").setValue("COMP-");
+      await searchFor("COMP-");
+
+      // Filtering happens on the server; the view shows whatever page the API returns.
+      await waitFor(() => expect(lastListParams()).toMatchObject({ q: "COMP-", page: 1 }));
+      await waitFor(() => expect(wrapper.text()).not.toContain("ENGL-1010"));
+      expect(wrapper.text()).toContain("COMP-2100");
+      expect(wrapper.text()).not.toContain("MATH-1100");
+    });
+
+    it("Users filter courses", async () => {
+      const composition = course({ name: "Composition", number: "ENGL-1010", department: "English" });
+      await mountCoursesAs(adminUser, [course(), composition]);
+      apiClient.get.mockResolvedValue(pageOf([composition]));
+
+      filterSelect("Department").vm.$emit("update:modelValue", ["English"]);
       await settle();
 
-      const text = wrapper.text();
-      expect(text).toContain("COMP-2100");
-      expect(text).not.toContain("ENGL-1010");
-      expect(text).not.toContain("MATH-1100");
+      await waitFor(() => expect(lastListParams()).toMatchObject({ department: "English", page: 1 }));
+      await waitFor(() => expect(wrapper.text()).not.toContain("COMP-2100"));
+      expect(wrapper.text()).toContain("ENGL-1010");
+
+      filterSelect("Semester").vm.$emit("update:modelValue", ["Fall", "Spring"]);
+      await settle();
+      await waitFor(() => expect(lastListParams()).toMatchObject({ department: "English", semester: "Fall,Spring" }));
+    });
+
+    it("Search with no matches", async () => {
+      await mountCoursesAs(adminUser, [course()]);
+      apiClient.get.mockResolvedValue(pageOf([]));
+
+      await searchFor("zzz");
+
+      await waitFor(() => expect(wrapper.text()).toContain("No courses match those search terms."));
+      expect(wrapper.text()).not.toContain("No courses yet");
     });
 
     it("Admin paginates through courses", async () => {
       const courses = Array.from({ length: 25 }, (_, i) =>
         course({ name: `Course ${i + 1}`, number: `COMP-${String(1001 + i)}` }),
       );
-      await mountCoursesAs(adminUser, courses);
+      await mountCoursesAs(adminUser, courses.slice(0, 20), { total: 25 });
 
+      expect(lastListParams()).toMatchObject({ page: 1, pageSize: 20 });
       expect(wrapper.text()).toContain("COMP-1001");
       expect(wrapper.text()).toContain("COMP-1020");
       expect(wrapper.text()).not.toContain("COMP-1021");
 
+      apiClient.get.mockResolvedValue(pageOf(courses.slice(20), { total: 25, page: 2 }));
       await wrapper.find('[aria-label="Next page"]').trigger("click");
       await settle();
 
-      expect(wrapper.text()).toContain("COMP-1021");
+      await waitFor(() => expect(lastListParams()).toMatchObject({ page: 2, pageSize: 20 }));
+      await waitFor(() => expect(wrapper.text()).toContain("COMP-1021"));
       expect(wrapper.text()).toContain("COMP-1025");
       expect(wrapper.text()).not.toContain("COMP-1001");
     });
@@ -319,7 +388,7 @@ describe("Feature 3 — Course Management UI", () => {
       await mountCoursesAs(adminUser, [programming]);
       const updated = { ...programming, semesters: ["Winter"] };
       apiClient.put.mockResolvedValueOnce({ data: updated });
-      apiClient.get.mockResolvedValue({ data: [updated] });
+      apiClient.get.mockResolvedValue(pageOf([updated]));
 
       await chooseCardAction(0, "Edit");
       const dialog = openDialog();
@@ -342,7 +411,7 @@ describe("Feature 3 — Course Management UI", () => {
       const programming = course();
       await mountCoursesAs(adminUser, [programming]);
       apiClient.delete.mockResolvedValueOnce({ data: { message: "course deleted successfully." } });
-      apiClient.get.mockResolvedValue({ data: [] });
+      apiClient.get.mockResolvedValue(pageOf([]));
 
       await chooseCardAction(0, "Delete");
       const dialog = openDialog();

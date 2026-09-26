@@ -1,6 +1,6 @@
 import axios from "axios";
-import Utils from "../config/utils.js";
 import router from "../router.js";
+import { setUser, user } from "../composables/useAuth.js";
 
 const apiClient = axios.create({
   baseURL: import.meta.env.DEV ? "http://localhost:3200/api/" : "/course-t1/",
@@ -8,10 +8,8 @@ const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  const user = Utils.getStore("user");
-
-  if (user?.token) {
-    config.headers.Authorization = `Bearer ${user.token}`;
+  if (user.value?.token) {
+    config.headers.Authorization = `Bearer ${user.value.token}`;
   }
 
   if (config.data instanceof FormData) {
@@ -24,10 +22,8 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message = error.response?.data?.message || "";
-
-    if (error.response?.status === 401 || /Unauthorized/i.test(message)) {
-      Utils.removeItem("user");
+    if (error.response?.status === 401) {
+      setUser(null);
       if (router.hasRoute("login")) {
         router.push({ name: "login" });
       }

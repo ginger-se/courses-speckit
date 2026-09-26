@@ -4,6 +4,7 @@ import cors from "cors";
 import morgan from "morgan";
 import db from "./app/models/index.js";
 import logger from "./app/config/logger.js";
+import { errorHandler } from "./app/helpers/errors.js";
 
 const shouldAlterSchema =
   process.env.SEQUELIZE_SYNC_ALTER === "true" ||
@@ -43,6 +44,7 @@ app.use(express.urlencoded({ extended: true }));
 const API_PREFIX = process.env.NODE_ENV === "production" ? "/course-t1" : "/api";
 
 app.use(API_PREFIX, routes);
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3200;
 

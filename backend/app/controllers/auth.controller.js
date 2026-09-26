@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import { Op } from "sequelize";
 import db from "../models/index.js";
 import authConfig from "../config/auth.config.js";
-import logger from "../config/logger.js";
+import { badRequest, unauthorized } from "../helpers/errors.js";
 
 const SALT_ROUNDS = 10;
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -47,97 +47,82 @@ const createOrReuseSession = async (user) => {
 const exports = {};
 
 exports.register = async (req, res) => {
-  try {
-    const { firstName, lastName, email, password } = req.body;
+  const { firstName, lastName, email, password } = req.body;
 
-    if (!firstName?.trim()) {
-      return res.status(400).send({ message: "First name is required." });
-    }
-    if (!lastName?.trim()) {
-      return res.status(400).send({ message: "Last name is required." });
-    }
-    if (!email?.trim()) {
-      return res.status(400).send({ message: "Email is required." });
-    }
-    if (!password) {
-      return res.status(400).send({ message: "Password is required." });
-    }
-    if (password.length < 8) {
-      return res.status(400).send({ message: "Password must be at least 8 characters." });
-    }
-
-    const existingEmail = await db.user.findOne({
-      where: { email: email.trim() },
-    });
-    if (existingEmail) {
-      return res.status(400).send({ message: "Email is already registered." });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-    const user = await db.user.create({
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      email: email.trim(),
-      password: hashedPassword,
-      role: "student",
-    });
-
-    const token = await createOrReuseSession(user);
-
-    return res.status(201).send(buildAuthResponse(user, token));
-  } catch (err) {
-    logger.error(`Registration failed: ${err.message}`);
-    return res.status(500).send({ message: "Registration failed." });
+  if (!firstName?.trim()) {
+    throw badRequest("First name is required.");
   }
+  if (!lastName?.trim()) {
+    throw badRequest("Last name is required.");
+  }
+  if (!email?.trim()) {
+    throw badRequest("Email is required.");
+  }
+  if (!password) {
+    throw badRequest("Password is required.");
+  }
+  if (password.length < 8) {
+    throw badRequest("Password must be at least 8 characters.");
+  }
+
+  // const existingEmail = await db.user.findOne({
+  //   where: { email: email.trim() },
+  // });
+  // if (existingEmail) {
+  //   throw badRequest("Email is already registered.");
+  // }
+
+  const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+  const user = await db.user.create({
+    firstName: firstName.trim(),
+    lastName: lastName.trim(),
+    email: email.trim(),
+    password: hashedPassword,
+    role: "student",
+  });
+
+  const token = await createOrReuseSession(user);
+
+  return res.status(201).send(buildAuthResponse(user, token));
 };
 
 exports.login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    if (!email?.trim()) {
-      return res.status(400).send({ message: "Email is required." });
-    }
-    if (!password) {
-      return res.status(400).send({ message: "Password is required." });
-    }
-
-    const user = await db.user.unscoped().findOne({
-      where: { email: email.trim() },
-    });
-
-    if (!user) {
-      return res.status(401).send({ message: "Invalid email or password." });
-    }
-
-    const passwordMatch = await bcrypt.compare(password, user.password);
-    if (!passwordMatch) {
-      return res.status(401).send({ message: "Invalid email or password." });
-    }
-
-    const token = await createOrReuseSession(user);
-
-    return res.status(200).send(buildAuthResponse(user, token));
-  } catch (err) {
-    logger.error(`Login failed: ${err.message}`);
-    return res.status(500).send({ message: "Login failed." });
+  if (!email?.trim()) {
+    throw badRequest("Email is required.");
   }
+  if (!password) {
+    throw badRequest("Password");
+  }
+
+  const user = await db.user.unscoped().findOne({
+    where: { email: email.trim() },
+  });
+
+  if (!user) {
+    throw unauthorized("Invalid email or password.");
+  }
+
+  const passwordMatch = await bcrypt.compare(password, user.password);
+  if (!passwordMatch) {
+    throw unauthorized("Invalid email or password.");
+  }
+
+  const token = await createOrReuseSession(user);
+
+  return res.status(200).send(buildAuthResponse(user, token));
 };
 
 exports.logout = async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization || "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
 
-    if (token) {
-      await db.session.update({ token: "" }, { where: { token } });
-    }
-
-    return res.status(200).send({ message: "Signed out successfully." });
-  } catch (err) {
-    logger.error(`Logout failed: ${err.message}`);
-    return res.status(500).send({ message: "Logout failed." });
+  if (token) {
+    await db.session.update({ token: "" }, { where: { token } });
   }
+
+  return res.status(200).send({ message: "Signed out successfully." });
 };
 
 export default exports;
