@@ -18,7 +18,7 @@ export default (sequelize, Sequelize) => {
       email: {
         type: Sequelize.STRING,
         allowNull: false,
-        unique: { msg: "Email is already registered." },
+        unique: true,
       },
       password: {
         type: Sequelize.STRING(255),

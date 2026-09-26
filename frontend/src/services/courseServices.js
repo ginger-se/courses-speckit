@@ -1,8 +1,8 @@
 import apiClient from "./services.js";
 
 const courseServices = {
-  getCourses(params = {}) {
-    return apiClient.get("courses", { params });
+  getCourses() {
+    return apiClient.get("courses");
   },
 
   getCourse(courseId) {

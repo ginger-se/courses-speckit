@@ -1,123 +1,64 @@
 ---
-description: Backend API architecture — Node, Express 5, Sequelize (ES modules). Controller, error, and response conventions.
+description: Backend API architecture — Node, Express, Sequelize (ES modules).
 globs: "backend/**/*, **/*.routes.js, **/*.controller.js, **/*.model.js"
 ---
 # Backend API Architecture
 
 ## Stack
 *   Node.js `"type": "module"` — import/export only.
-*   Express 5, mounted at `/api` (development and test) and `/course-t1` (production).
+*   Express 4, mounted at `/todo/`.
 *   Sequelize 6 + mysql2; config in `app/config/db.config.js` via dotenv.
-*   Separate `sequelizeInstance.js`; models register in `models/index.js`.
+*   Separate `sequelizeInstance.js`; models import it and register in `models/index.js`.
 *   bcryptjs + jsonwebtoken + Session model for auth.
 *   winston + morgan (morgan streams to winston).
 
 ## server.js Responsibilities
-*   `db.sequelize.sync()` on startup; `{ alter: true }` in development unless `SEQUELIZE_SYNC_ALTER=false`.
-*   CORS with `credentials: true` and the frontend origin.
+*   `db.sequelize.sync()` on startup; optional `{ alter: true }` when `SEQUELIZE_SYNC_ALTER=true`.
+*   CORS with `credentials: true` and frontend origin.
 *   `express.json()` and `urlencoded({ extended: true })`.
-*   Mount routes: `app.use(API_PREFIX, routes)`, then `app.use(errorHandler)` **last**.
+*   Mount routes: `app.use("/todo", routes)`.
 *   Export `app` as default; call `listen()` only when `NODE_ENV !== "test"`.
 
 ## Route Layout
 *   `app/routes/index.js` — central router registering each `*.routes.js`.
-*   Auth at mount root: `POST /register`, `POST /login`, `POST /logout`.
-*   Resource routes: `router.use("/courses", courseRoutes)`; one `resource.routes.js` per resource.
-*   Multi-word URL segments are kebab-case (`/course-listing`).
-*   Nested children on the parent router: `GET /sections/:sectionId/students`.
+*   Auth at mount root: `POST /register`, `POST /login`, `POST /logout`, `POST /reset-password` (dev only).
+*   Resource routes: `router.use("/lists", ListRoutes)` etc.
+*   Nested children on parent router: `GET /lists/:listId/todos`.
 
-```javascript
-router.get("/", [authenticate], courseController.findAll);
-router.get("/:id", [authenticate], courseController.findOne);
-router.post("/", [authenticateAdmin], courseController.create);
-router.put("/:id", [authenticateAdmin], courseController.update);
-router.delete("/:id", [authenticateAdmin], courseController.remove);
-```
-
-## Status Codes
-| Code | When |
-|------|------|
-| `400` | Invalid input, invalid id, or a duplicate unique value |
-| `401` | Not signed in — missing, invalid, or expired token (the frontend signs the user out) |
-| `403` | Signed in but wrong role — `{ message: "Not Authorized." }` |
-| `404` | Row not found, **or** not owned by the caller (never `403` for someone else's row) |
-| `500` | Unexpected error — sent only by `errorHandler` |
+Todo REST shape:
+*   `GET/POST /todo/lists`
+*   `GET/POST /todo/lists/:listId/todos`
+*   `PUT/DELETE /todo/todos/:id`
 
 ## Controller Pattern
-Controllers **throw** errors; they never `try/catch` just to send a 500. Express 5 forwards thrown errors and rejected promises to `errorHandler` (`app/helpers/errors.js`), which sends `{ message }` with the right status and logs anything unexpected.
-
 ```javascript
 import db from "../models/index.js";
-import { parseToNumber } from "../helpers/fields.js";
-import { badRequest, notFound } from "../helpers/errors.js";
+import logger from "../config/logger.js";
 
 const exports = {};
-
-exports.update = async (req, res) => {
-  const courseId = parseToNumber(req.params.id);
-  if (courseId === null) {
-    throw badRequest("Invalid course id.");
-  }
-
-  const course = await db.course.findByPk(courseId);
-  if (!course) {
-    throw notFound("Course", courseId);
-  }
-
-  const { message, values } = validateCourse(req.body ?? {});
-  if (message) {
-    throw badRequest(message);
-  }
-
-  await course.update(values);
-  return res.send(course);
-};
-
+exports.findAll = async (req, res) => { /* ... */ };
 export default exports;
 ```
-
-*   Error helpers: `badRequest(message)`, `unauthorized(message)`, `forbidden()`, `notFound(label, id)`. Pass a capitalized label: `notFound("Course", id)`.
-*   Parse route ids with `parseToNumber(req.params.id)`; throw `badRequest("Invalid <resource> id.")` on `null`. Read ids from `req.params` only, never from the body.
-*   Validate the body with one `validate<Resource>(body)` function shared by `create` and `update`. It returns `{ message }` for the first problem (naming the field) or `{ values }` (trimmed, ready to save).
-*   Save only `values` from the validator — never pass `req.body` straight to `create`/`update`.
-*   Use `logger.debug/warn/error` — never `console.log`. Controllers don't log errors; `errorHandler` does.
-*   Sequelize `include` for associations; always add `["id", "ASC"]` as the last `order` entry so paging is stable.
-
-## Express 5 Gotchas
-*   `req.body` is `undefined` when no body was parsed — use `req.body ?? {}`.
-*   `req.query` is read-only — put parsed values elsewhere; never reassign it.
-*   Repeated query keys become arrays (`?x=a&x=b`); bracket syntax (`?x[]=a`) is **not** parsed. List filters accept repeated keys or commas (`?department=Art,English`).
-*   Route wildcards must be named (`/*splat`, not `*`).
-
-## Uniqueness
-Declare unique fields in the model with a message, and let the database enforce them. Do **not** look up duplicates before saving — `errorHandler` turns `UniqueConstraintError` into `400 { message }`.
-
-```javascript
-number: {
-  type: Sequelize.STRING,
-  allowNull: false,
-  unique: { msg: "Course number is already taken." },
-},
-```
-
-For a rule across several columns, use a model-level unique index and cover the duplicate case in tests.
+*   Parse route IDs: `parseInt(req.params.id, 10)`; reject `NaN`.
+*   Use `logger.debug/warn/error` — never `console.log`.
+*   Sequelize `include` for associations; `order` for stable list sorting.
 
 ## JSON Responses
-*   **Success:** `res.send(data)`, `res.status(201).send(created)` for creates.
-*   **Failure:** `{ message: "Human-readable explanation." }` — via a thrown error helper, not `res.status(4xx)` in controllers.
-*   **404 format:** ``{ message: `Course with id=${id} not found.` }`` (produced by `notFound`).
-*   **Paginated lists:** `{ items, total, page, pageSize, pageCount }`. Defaults: `page=1`, `pageSize=20`, maximum `100`.
+*   **Success:** `res.send(data)` or `res.status(201).send(created)`.
+*   **Failure:** `res.status(4xx).send({ message: "Human-readable explanation." })`.
+*   **404 format:** ``{ message: `List with id=${id} not found.` }``
 *   Do **not** use `{ success, data }` envelopes.
 
 ## Model Conventions
 *   Sensitive fields excluded via `defaultScope` (e.g. User password).
 *   Use `Model.unscoped()` only when password compare is required at login.
-*   Associations (`hasMany`/`belongsTo`) defined in `models/index.js`, not in controllers.
+*   Associations and `hasMany`/`belongsTo` defined in `models/index.js`, not scattered in controllers.
 
 ## Schema Changes
-The schema is created from the models by `sequelize.sync()`. There are no migration scripts. After changing unique indexes, check `SHOW INDEX FROM <table>;` — `alter` sync can add duplicate indexes.
+Incremental scripts in `app/scripts/` — one concern per file, runnable via `npm run <script>`.
 
 ## Protected Routes
-*   `authenticate` reads `Authorization: Bearer <token>`, finds a non-expired Session row, and sets `req.user = { id, role }`. Missing or invalid → `401`.
-*   `authenticateAdmin` does the same, then returns `403 { message: "Not Authorized." }` for non-admins.
-*   Row ownership checks belong in `app/authorization/` helpers, not inline in controllers (see `security.mdc`).
+```javascript
+router.get("/", [authenticate], controller.findAll);
+```
+`authenticate` looks up Bearer token in Session table, checks expiration, sets `req.user`.

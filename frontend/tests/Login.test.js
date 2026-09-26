@@ -7,7 +7,6 @@ import { flushPromises, mount } from "@vue/test-utils";
 import App from "../src/App.vue";
 import router from "../src/router.js";
 import apiClient from "../src/services/services.js";
-import { syncUser } from "../src/composables/useAuth.js";
 import { vuetify } from "./testUtils.js";
 
 vi.mock("../src/services/services.js", () => ({
@@ -196,8 +195,6 @@ describe("Feature 1 — User Authentication and Session Management UI", () => {
     it("API request includes session token", async () => {
       const { default: realClient } = await vi.importActual("../src/services/services.js");
       localStorage.setItem("user", JSON.stringify(storedUser));
-      // A real page load reads the stored session at startup; the module is already loaded here.
-      syncUser();
       let sentHeaders;
 
       await realClient.get("users/1", {

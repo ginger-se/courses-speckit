@@ -3,13 +3,22 @@ import Utils from "./config/utils.js";
 import Login from "./views/Login.vue";
 import Register from "./views/Register.vue";
 import Courses from "./views/Courses.vue";
-import { syncUser } from "./composables/useAuth.js";
+
+const publicRouteNames = new Set(["login", "register"]);
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: "/login", name: "login", component: Login, meta: { public: true } },
-    { path: "/register", name: "register", component: Register, meta: { public: true } },
+    {
+      path: "/login",
+      name: "login",
+      component: Login,
+    },
+    {
+      path: "/register",
+      name: "register",
+      component: Register,
+    },
     {
       path: "/",
       name: "home",
@@ -22,15 +31,21 @@ const router = createRouter({
   ],
 });
 
-router.beforeEach((to) => {
-  const user = syncUser();
+router.beforeEach((to, _from, next) => {
+  const user = Utils.getStore("user");
+  const isPublicRoute = publicRouteNames.has(to.name);
 
-  if (!user && !to.meta.public) {
-    return { name: "login" };
+  if (!user && !isPublicRoute) {
+    next({ name: "login" });
+    return;
   }
-  if (user && to.meta.public) {
-    return { name: "home" };
+
+  if (user && isPublicRoute) {
+    next({ name: "home" });
+    return;
   }
+
+  next();
 });
 
 export default router;

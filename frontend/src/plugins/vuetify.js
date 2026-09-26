@@ -55,10 +55,6 @@ const vuetify = createVuetify({
       density: "comfortable",
       rounded: "lg",
     },
-    VSelect: {
-      density: "comfortable",
-      rounded: "lg",
-    },
     VAlert: {
       density: "compact",
     },

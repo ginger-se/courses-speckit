@@ -1,29 +1,8 @@
 <script setup>
-import { computed, onMounted, ref, reactive, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import courseServices from "../services/courseServices.js";
 import CourseForm from "../components/forms/CourseForm.vue";
 import Utils from "../config/utils.js";
-import { SEMESTERS, DEPARTMENTS, FREQUENCIES } from "@shared/constants.js";
-import { useAuth } from "../composables/useAuth.js";
-
-const SORTABLE = [
-  {
-    label: "Number",
-    value: "number",
-  },
-  {
-    label: "Name",
-    value: "name",
-  },
-  {
-    label: "Hours",
-    value: "hours",
-  },
-  {
-    label: "Department",
-    value: "department",
-  },
-];
 
 const emptyForm = () => ({
   name: "",
@@ -37,8 +16,10 @@ const emptyForm = () => ({
 
 const ITEMS_PER_PAGE = 20;
 
-const { isAdmin } = useAuth();
+const user = ref(Utils.getStore("user"));
 const courses = ref([]);
+const query = ref("");
+const page = ref(1);
 const loading = ref(false);
 const listError = ref("");
 const formDialogOpen = ref(false);
@@ -51,41 +32,18 @@ const editingId = ref(null);
 const deleteDialogOpen = ref(false);
 const courseToDelete = ref(null);
 const deleting = ref(false);
-const deleteError = ref("");
 
 const formTitle = computed(() => (isAddMode.value ? "Add Course" : "Edit Course"));
 const saveLabel = computed(() => (isAddMode.value ? "Create" : "Save"));
-
-const filters = reactive({ q: "", department: [], semester: [], frequency: [], sort: "number" });
-const page = ref(1);
-const total = ref(0);
-const pageCount = ref(0);
-
-const hasFilters = computed(
-  () => !!filters.q.trim() || filters.department.length || filters.semester.length || filters.frequency.length,
-);
+const isAdmin = computed(() => user.value?.role === "admin");
 
 const retrieveCourses = async () => {
   loading.value = true;
   listError.value = "";
 
   try {
-    const { data } = await courseServices.getCourses({
-      q: filters.q.trim() || undefined,
-      department: filters.department.join(",") || undefined,
-      semester: filters.semester.join(",") || undefined,
-      frequency: filters.frequency.join(",") || undefined,
-      sort: filters.sort,
-      page: page.value,
-      pageSize: ITEMS_PER_PAGE,
-    });
-    courses.value = data.items;
-    total.value = data.total;
-    pageCount.value = data.pageCount;
-
-    if (page.value > 1 && page.value > data.pageCount) {
-      page.value = data.pageCount || 1;
-    }
+    const response = await courseServices.getCourses();
+    courses.value = response.data;
   } catch (error) {
     listError.value = error.response?.data?.message || "Failed to fetch courses.";
   } finally {
@@ -93,25 +51,28 @@ const retrieveCourses = async () => {
   }
 };
 
-// debounce search field so we don't overload the server
-let searchTimer;
-watch(
-  () => filters.q,
-  () => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => {
-      page.value === 1 ? retrieveCourses() : (page.value = 1);
-    }, 300);
-  },
-);
+const filteredCourses = computed(() => {
+  if (!query.value) return courses.value;
 
-watch(
-  () => [filters.department, filters.semester, filters.frequency, filters.sort],
-  () => {
-    page.value === 1 ? retrieveCourses() : (page.value = 1);
-  },
-  { deep: true },
-);
+  const search = query.value.trim().toLowerCase().split(" ");
+  return courses.value.filter((course) =>
+    search.every(
+      (word) =>
+        course.name.toLowerCase().includes(word) ||
+        course.number.toLowerCase().includes(word) ||
+        course.department.toLowerCase().includes(word) ||
+        course.description.toLowerCase().includes(word) ||
+        course.semesters.some((semester) => semester.toLowerCase().includes(word)),
+    ),
+  );
+});
+
+const pageCount = computed(() => Math.ceil(filteredCourses.value.length / ITEMS_PER_PAGE));
+const paginatedCourses = computed(() => {
+  const start = (page.value - 1) * ITEMS_PER_PAGE;
+  const end = start + ITEMS_PER_PAGE;
+  return filteredCourses.value.slice(start, end);
+});
 
 const openAddDialog = () => {
   isAddMode.value = true;
@@ -182,7 +143,6 @@ const saveCourse = async () => {
 
 const openDeleteDialog = (course) => {
   courseToDelete.value = course;
-  deleteError.value = "";
   deleteDialogOpen.value = true;
 };
 
@@ -197,20 +157,18 @@ const confirmDeleteCourse = async () => {
   }
 
   deleting.value = true;
-  deleteError.value = "";
+  listError.value = "";
 
   try {
     await courseServices.removeCourse(courseToDelete.value.id);
     closeDeleteDialog();
     await retrieveCourses();
   } catch (error) {
-    deleteError.value = error.response?.data?.message || "Failed to delete course.";
+    listError.value = error.response?.data?.message || "Failed to delete course.";
   } finally {
     deleting.value = false;
   }
 };
-
-watch(page, retrieveCourses);
 
 onMounted(retrieveCourses);
 </script>
@@ -227,26 +185,19 @@ onMounted(retrieveCourses);
     </v-toolbar>
 
     <v-card-text>
-      <!-- fixed-height slot so showing/hiding the bar doesn't shift the list -->
-      <div class="mb-4" style="height: 4px">
-        <v-progress-linear v-if="loading" indeterminate />
-      </div>
+      <v-progress-linear v-if="loading" indeterminate class="mb-4" />
 
       <v-alert v-if="listError" type="error" density="compact" class="mb-4">
         {{ listError }}
       </v-alert>
 
-      <p v-if="!hasFilters && total === 0" class="text-body-1">No courses yet. Create your first course.</p>
-      <p v-else-if="hasFilters && total === 0" class="text-body-1">No courses match those search terms.</p>
+      <p v-if="!loading && courses.length === 0" class="text-body-1">No courses yet. Create your first course.</p>
+      <p v-else-if="filteredCourses.length === 0" class="text-body-1">No courses match those search terms.</p>
       <div class="d-flex flex-column ga-4">
         <v-row>
-          <v-text-field v-model="filters.q" prepend-inner-icon="mdi-magnify" placeholder="Search courses..." />
-          <v-select v-model="filters.department" :items="DEPARTMENTS" label="Department" multiple chips clearable />
-          <v-select v-model="filters.semester" :items="SEMESTERS" label="Semester" multiple chips clearable />
-          <v-select v-model="filters.frequency" :items="FREQUENCIES" label="Frequency" multiple clearable />
-          <v-select v-model="filters.sort" :items="SORTABLE" item-title="label" item-value="value" label="Sort by" />
+          <v-text-field v-model="query" prepend-inner-icon="mdi-magnify" placeholder="Search courses..." />
         </v-row>
-        <v-card v-for="course in courses" :key="course.id">
+        <v-card v-for="course in paginatedCourses">
           <v-card-item>
             <v-card-title>{{ course.name }}</v-card-title>
 
@@ -294,14 +245,16 @@ onMounted(retrieveCourses);
 
               <v-chip color="blue">{{ course.frequency }}</v-chip>
 
-              <v-chip color="green" v-for="semester in course.semesters" :key="semester">{{ semester }}</v-chip>
+              <v-chip color="green" v-for="semester in course.semesters">{{ semester }}</v-chip>
             </div>
           </div>
         </v-card>
       </div>
     </v-card-text>
 
-    <v-pagination v-if="pageCount > 1" v-model="page" :length="pageCount" :total-visible="7" class="mt-4" />
+    <v-row justify="center" class="mt-4" v-if="pageCount > 1">
+      <v-pagination v-model="page" :length="pageCount"></v-pagination>
+    </v-row>
 
     <v-dialog v-model="formDialogOpen" max-width="800">
       <v-card rounded="lg">
@@ -325,10 +278,7 @@ onMounted(retrieveCourses);
     <v-dialog v-model="deleteDialogOpen" max-width="420">
       <v-card rounded="lg">
         <v-card-title>Delete course</v-card-title>
-        <v-card-text>
-          Delete this course?
-          <v-alert v-if="deleteError" type="error" density="compact" class="mt-2">{{ deleteError }}</v-alert>
-        </v-card-text>
+        <v-card-text>Delete this course?</v-card-text>
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="closeDeleteDialog">Cancel</v-btn>

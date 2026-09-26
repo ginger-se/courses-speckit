@@ -4,10 +4,8 @@ import Utils from "../config/utils.js";
 import { emailRules } from "../config/validation.js";
 import authServices from "../services/authServices.js";
 import userServices from "../services/userServices.js";
-import { setUser, useAuth } from "../composables/useAuth.js";
 
-const { user } = useAuth();
-
+const user = ref(Utils.getStore("user"));
 const profileMenuOpen = ref(false);
 const editDialogOpen = ref(false);
 const editForm = ref(null);
@@ -33,6 +31,20 @@ const displayName = computed(() => {
 
   const parts = [user.value.firstName, user.value.lastName].filter(Boolean);
   return parts.length ? parts.join(" ") : (user.value.email ?? "");
+});
+
+const refreshUser = () => {
+  user.value = Utils.getStore("user");
+};
+
+onMounted(() => {
+  window.addEventListener("user-logged-in", refreshUser);
+  window.addEventListener("user-logged-out", refreshUser);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("user-logged-in", refreshUser);
+  window.removeEventListener("user-logged-out", refreshUser);
 });
 
 const resetPasswordFields = () => {
@@ -98,7 +110,18 @@ const handleSaveProfile = async () => {
     const response = await userServices.updateUser(user.value.userId, payload);
     const currentUser = Utils.getStore("user");
 
-    setUser({ ...user.value, ...response.data, ...response.data.id });
+    Utils.setStore("user", {
+      ...currentUser,
+      ...response.data,
+      userId: response.data.id,
+      firstName: response.data.firstName,
+      lastName: response.data.lastName,
+      email: response.data.email,
+      role: response.data.role,
+      token: currentUser.token,
+    });
+    refreshUser();
+    window.dispatchEvent(new CustomEvent("user-logged-in"));
     closeEditDialog();
   } catch (error) {
     profileError.value = error.response?.data?.message || "Failed to update profile.";
