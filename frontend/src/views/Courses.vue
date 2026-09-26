@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import courseServices from "../services/courseServices.js";
 import CourseForm from "../components/forms/CourseForm.vue";
 import Utils from "../config/utils.js";
@@ -32,6 +32,10 @@ const editingId = ref(null);
 const deleteDialogOpen = ref(false);
 const courseToDelete = ref(null);
 const deleting = ref(false);
+
+watch(query, () => {
+  page.value = 1;
+});
 
 const formTitle = computed(() => (isAddMode.value ? "Add Course" : "Edit Course"));
 const saveLabel = computed(() => (isAddMode.value ? "Create" : "Save"));
@@ -253,7 +257,9 @@ onMounted(retrieveCourses);
     </v-card-text>
 
     <v-row justify="center" class="mt-4" v-if="pageCount > 1">
-      <v-pagination v-model="page" :length="pageCount"></v-pagination>
+      <v-col cols="12">
+        <v-pagination v-model="page" :length="pageCount" />
+      </v-col>
     </v-row>
 
     <v-dialog v-model="formDialogOpen" max-width="800">
