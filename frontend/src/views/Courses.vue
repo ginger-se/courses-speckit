@@ -1,8 +1,28 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, reactive, watch } from "vue";
 import courseServices from "../services/courseServices.js";
 import CourseForm from "../components/forms/CourseForm.vue";
 import Utils from "../config/utils.js";
+import { SEMESTERS, DEPARTMENTS, FREQUENCIES } from "../utils/constants.js";
+
+const SORTABLE = [
+  {
+    label: "Number",
+    value: "number",
+  },
+  {
+    label: "Name",
+    value: "name",
+  },
+  {
+    label: "Hours",
+    value: "hours",
+  },
+  {
+    label: "Department",
+    value: "department",
+  },
+];
 
 const emptyForm = () => ({
   name: "",
@@ -18,8 +38,6 @@ const ITEMS_PER_PAGE = 20;
 
 const user = ref(Utils.getStore("user"));
 const courses = ref([]);
-const query = ref("");
-const page = ref(1);
 const loading = ref(false);
 const listError = ref("");
 const formDialogOpen = ref(false);
@@ -37,13 +55,36 @@ const formTitle = computed(() => (isAddMode.value ? "Add Course" : "Edit Course"
 const saveLabel = computed(() => (isAddMode.value ? "Create" : "Save"));
 const isAdmin = computed(() => user.value?.role === "admin");
 
+const filters = reactive({ q: "", department: [], semester: [], frequency: [], sort: "number" });
+const page = ref(1);
+const total = ref(0);
+const pageCount = ref(0);
+
+const hasFilters = computed(
+  () => !!filters.q.trim() || filters.department.length || filters.semester.length || filters.frequency.length,
+);
+
 const retrieveCourses = async () => {
   loading.value = true;
   listError.value = "";
 
   try {
-    const response = await courseServices.getCourses();
-    courses.value = response.data;
+    const { data } = await courseServices.getCourses({
+      q: filters.q.trim() || undefined,
+      department: filters.department.join(",") || undefined,
+      semester: filters.semester.join(",") || undefined,
+      frequency: filters.frequency.join(",") || undefined,
+      sort: filters.sort,
+      page: page.value,
+      pageSize: ITEMS_PER_PAGE,
+    });
+    courses.value = data.items;
+    total.value = data.total;
+    pageCount.value = data.pageCount;
+
+    if (page.value > 1 && page.value > data.pageCount) {
+      page.value = data.pageCount || 1;
+    }
   } catch (error) {
     listError.value = error.response?.data?.message || "Failed to fetch courses.";
   } finally {
@@ -51,28 +92,25 @@ const retrieveCourses = async () => {
   }
 };
 
-const filteredCourses = computed(() => {
-  if (!query.value) return courses.value;
+// debounce search field so we don't overload the server
+let searchTimer;
+watch(
+  () => filters.q,
+  () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      page.value === 1 ? retrieveCourses() : (page.value = 1);
+    }, 300);
+  },
+);
 
-  const search = query.value.trim().toLowerCase().split(" ");
-  return courses.value.filter((course) =>
-    search.every(
-      (word) =>
-        course.name.toLowerCase().includes(word) ||
-        course.number.toLowerCase().includes(word) ||
-        course.department.toLowerCase().includes(word) ||
-        course.description.toLowerCase().includes(word) ||
-        course.semesters.some((semester) => semester.toLowerCase().includes(word)),
-    ),
-  );
-});
-
-const pageCount = computed(() => Math.ceil(filteredCourses.value.length / ITEMS_PER_PAGE));
-const paginatedCourses = computed(() => {
-  const start = (page.value - 1) * ITEMS_PER_PAGE;
-  const end = start + ITEMS_PER_PAGE;
-  return filteredCourses.value.slice(start, end);
-});
+watch(
+  () => [filters.department, filters.semester, filters.frequency, filters.sort],
+  () => {
+    page.value === 1 ? retrieveCourses() : (page.value = 1);
+  },
+  { deep: true },
+);
 
 const openAddDialog = () => {
   isAddMode.value = true;
@@ -170,6 +208,8 @@ const confirmDeleteCourse = async () => {
   }
 };
 
+watch(page, retrieveCourses);
+
 onMounted(retrieveCourses);
 </script>
 
@@ -185,19 +225,26 @@ onMounted(retrieveCourses);
     </v-toolbar>
 
     <v-card-text>
-      <v-progress-linear v-if="loading" indeterminate class="mb-4" />
+      <!-- fixed-height slot so showing/hiding the bar doesn't shift the list -->
+      <div class="mb-4" style="height: 4px">
+        <v-progress-linear v-if="loading" indeterminate />
+      </div>
 
       <v-alert v-if="listError" type="error" density="compact" class="mb-4">
         {{ listError }}
       </v-alert>
 
-      <p v-if="!loading && courses.length === 0" class="text-body-1">No courses yet. Create your first course.</p>
-      <p v-else-if="filteredCourses.length === 0" class="text-body-1">No courses match those search terms.</p>
+      <p v-if="!hasFilters && total === 0" class="text-body-1">No courses yet. Create your first course.</p>
+      <p v-else-if="hasFilters && total === 0" class="text-body-1">No courses match those search terms.</p>
       <div class="d-flex flex-column ga-4">
         <v-row>
-          <v-text-field v-model="query" prepend-inner-icon="mdi-magnify" placeholder="Search courses..." />
+          <v-text-field v-model="filters.q" prepend-inner-icon="mdi-magnify" placeholder="Search courses..." />
+          <v-select v-model="filters.department" :items="DEPARTMENTS" label="Department" multiple chips clearable />
+          <v-select v-model="filters.semester" :items="SEMESTERS" label="Semester" multiple chips clearable />
+          <v-select v-model="filters.frequency" :items="FREQUENCIES" label="Frequency" multiple clearable />
+          <v-select v-model="filters.sort" :items="SORTABLE" item-title="label" item-value="value" label="Sort by" />
         </v-row>
-        <v-card v-for="course in paginatedCourses">
+        <v-card v-for="course in courses">
           <v-card-item>
             <v-card-title>{{ course.name }}</v-card-title>
 
@@ -252,9 +299,7 @@ onMounted(retrieveCourses);
       </div>
     </v-card-text>
 
-    <v-row justify="center" class="mt-4" v-if="pageCount > 1">
-      <v-pagination v-model="page" :length="pageCount"></v-pagination>
-    </v-row>
+    <v-pagination v-if="pageCount > 1" v-model="page" :length="pageCount" :total-visible="7" class="mt-4" />
 
     <v-dialog v-model="formDialogOpen" max-width="800">
       <v-card rounded="lg">

@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from "vue";
+import { DEPARTMENTS, SEMESTERS, FREQUENCIES } from "../../utils/constants";
 
 const props = defineProps({
   modelValue: { type: Object, required: true },
@@ -8,10 +9,6 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue", "submit"]);
 
 const formRef = ref(null);
-
-const DEPARTMENTS = ["Computer Science", "Engineering", "English", "Business", "Art"];
-const FREQUENCIES = ["Yearly", "Even Years", "Odd Years"];
-const SEMESTERS = ["Fall", "Winter", "Spring", "Summer"];
 
 const updateField = (field, value) => {
   emit("update:modelValue", { ...props.modelValue, [field]: value });
@@ -36,7 +33,10 @@ const semestersRules = [
     `Semesters offered must be one or more of ${SEMESTERS.join(", ")}.`,
 ];
 const descriptionRules = [(v) => !!v || "Description is required"];
-const frequencyRules = [(v) => !!v || "Frequency is required"];
+const frequencyRules = [
+  (v) => !!v || "Frequency is required",
+  (value) => FREQUENCIES.includes(value) || `Frequency must be one of ${FREQUENCIES.join(", ")}.`,
+];
 const hoursRules = [(v) => !v || Number.isInteger(Number(v)) || "Value must be an integer"];
 
 const validate = () => formRef.value.validate();

@@ -18,7 +18,7 @@ export const requiredInt = (value) => {
   return Number(value);
 };
 
-export const parseId = (value) => {
+export const parseToNumber = (value) => {
   const parsed = parseInt(value, 10);
   return Number.isNaN(parsed) ? null : parsed;
 };
