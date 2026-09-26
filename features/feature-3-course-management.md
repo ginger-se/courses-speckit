@@ -41,14 +41,14 @@
 **Independent test:** Courses view has search/filter/pagination functionality  
 **Acceptance scenarios:** see ### US-3.3 under Acceptance Criteria
 
-### US-3.4: Manage course rows
+### US-3.4: Manage course cards
 
 **As a** signed-in admin user  
-**I want** each course row to show **edit** and **delete** actions  
+**I want** each course card to offer **edit** and **delete** actions  
 **So that** I can manage courses without leaving the courses view
 
 **Priority:** P1  
-**Independent test:** Each course row exposes edit and delete icon actions  
+**Independent test:** Each course card has a **Course actions** menu with **Edit** and **Delete**  
 **Acceptance scenarios:** see ### US-3.4 under Acceptance Criteria
 
 ### US-3.5: Edit and delete courses
@@ -58,7 +58,7 @@
 **So that** I can keep the course catalogue organized
 
 **Priority:** P2  
-**Independent test:** Edit and delete courses from row actions; courses view updates  
+**Independent test:** Edit and delete courses from the card actions menu; courses view updates  
 **Acceptance scenarios:** see ### US-3.5 under Acceptance Criteria
 
 ---
@@ -69,13 +69,13 @@
 
 - **FR-001**: All course endpoints MUST require a valid session (`authenticate` middleware).
 - **FR-002**: All course fields MUST be trimmed before save; empty strings MUST be rejected.
-- **FR-003**: Courses MUST be ordered alphabetically by courseNumber in API responses.
+- **FR-003**: Courses MUST be ordered alphabetically by `number` in API responses.
 - **FR-004**: This feature MUST deliver course CRUD and a **single-view** courses UI in `Courses.vue` (dialog-based add/edit/delete). No sidebar/main split.
-- **FR-005**: `courseNumber` MUST be in the format of XXXX-#### (ex. COMP-2100)
-- **FR-006**: `courseName` MUST be no longer than 255 characters
-- **FR-007**: `courseFrequency` MUST be one of `Yearly`, `Odd Years`, `Even Years`
-- **FR-008**: `courseSemester` MUST be one or more of ["Fall", "Winter", "Spring", "Summer"]
-- **FR-009**: `courseHours` MUST be a multiple of `0.5`
+- **FR-005**: `number` MUST be in the format of XXXX-#### (ex. COMP-2100)
+- **FR-006**: `name` MUST be no longer than 255 characters
+- **FR-007**: `frequency` MUST be one of `Yearly`, `Odd Years`, `Even Years`
+- **FR-008**: `semesters` MUST be one or more of ["Fall", "Winter", "Spring", "Summer"]
+- **FR-009**: `hours` MUST be an integer
 
 ---
 
@@ -105,25 +105,25 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 
 ## API Requirements
 
-| Method   | Endpoint             | Auth        | Purpose             |
-| -------- | -------------------- | ----------- | ------------------- |
-| `GET`    | `/courses`           | Yes         | Fetch all courses   |
-| `GET`    | `/courses/:courseId` | Yes         | Fetch a single      |
-| `POST`   | `/courses`           | Yes - Admin | Create a new course |
-| `PUT`    | `/courses/:courseId` | Yes - Admin | Edit a course       |
-| `DELETE` | `/courses/:courseId` | Yes - Admin | Delete course       |
+| Method   | Endpoint       | Auth        | Purpose             |
+| -------- | -------------- | ----------- | ------------------- |
+| `GET`    | `/courses`     | Yes         | Fetch all courses   |
+| `GET`    | `/courses/:id` | Yes         | Fetch a single      |
+| `POST`   | `/courses`     | Yes - Admin | Create a new course |
+| `PUT`    | `/courses/:id` | Yes - Admin | Edit a course       |
+| `DELETE` | `/courses/:id` | Yes - Admin | Delete course       |
 
 **Create course request body:**
 
 ```json
 {
-  "courseNumber": "COMP-2100",
-  "courseName": "Programming II",
-  "courseDescription": "Magna tempor ipsum reprehenderit nostrud laboris eu non Lorem. Ipsum est pariatur ut officia excepteur non laboris.",
-  "courseSemester": "Fall",
-  "courseFrequency": "Yearly",
-  "courseHours": 3,
-  "courseDept": "Computer Science"
+  "number": "COMP-2100",
+  "name": "Programming II",
+  "description": "Magna tempor ipsum reprehenderit nostrud laboris eu non Lorem. Ipsum est pariatur ut officia excepteur non laboris.",
+  "semesters": ["Fall"],
+  "frequency": "Yearly",
+  "hours": 3,
+  "department": "Computer Science"
 }
 ```
 
@@ -132,13 +132,13 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 ```json
 {
   "id": 1,
-  "courseNumber": "COMP-2100",
-  "courseName": "Programming II",
-  "courseDescription": "Magna tempor ipsum reprehenderit nostrud laboris eu non Lorem. Ipsum est pariatur ut officia excepteur non laboris.",
-  "courseSemester": "Fall",
-  "courseFrequency": "Yearly",
-  "courseHours": 3,
-  "courseDept": "Computer Science",
+  "number": "COMP-2100",
+  "name": "Programming II",
+  "description": "Magna tempor ipsum reprehenderit nostrud laboris eu non Lorem. Ipsum est pariatur ut officia excepteur non laboris.",
+  "semesters": ["Fall"],
+  "frequency": "Yearly",
+  "hours": 3,
+  "department": "Computer Science",
   "createdAt": "2026-07-02T12:00:00.000Z",
   "updatedAt": "2026-07-02T12:00:00.000Z"
 }
@@ -160,14 +160,15 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 - Heading: **Courses**
 - Primary action: **+ New Course** opens a `<v-dialog>` with a name `<v-text-field>` and **Create** / **Cancel**. Use class `oc-cta` on **Create** and **+ New List** (per [ui-style-system.mdc](../../.cursor/rules/ui-style-system.mdc)).
 - Secondary action: **Search** input field
-- Display courses as rows (e.g. `<v-list>` or table): each row shows the **course name**, **course number**, **semester**, **frequency**, **hours**, **department** and icon actions:
-  - **Edit** icon — opens rename `<v-dialog>` pre-filled with current data; **Save** / **Cancel**
-  - **Delete** icon — opens confirmation `<v-dialog>`
-- Icon-only row actions use `size="small"` and accessible `aria-label`s (**Edit course**, **Delete course**).
+- Display courses as a vertical stack of `<v-card>`s, one per course (no table). Each card shows the **course name** (title), **department** and **course number** (subtitle), **description**, and chips for **hours**, **frequency**, and each **semester**.
+- For admins, each card header has an icon-only overflow button (`mdi-dots-vertical`, `aria-label="Course actions"`) that opens a `<v-menu>` with:
+  - **Edit** — opens the course `<v-dialog>` pre-filled with current data; **Save** / **Cancel**
+  - **Delete** — opens confirmation `<v-dialog>`
+- Non-admins do not see the **Course actions** button.
 - **Empty state:** **"No courses yet. Create your first course."** when there are no courses.
 - **Loading state:** skeleton or progress indicator while courses are fetching.
 - **Error state:** `<v-alert type="error">` for API failures.
-- **Pagination:** courses are paginated when there are more than 20 rows
+- **Pagination:** courses are paginated when there are more than 20 courses (20 cards per page)
 
 **Implementation note:** one route/view for courses; courses CRUD dialogs are child components or inline `<v-dialog>` blocks in `Courses.vue`.
 
@@ -183,18 +184,18 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 
 ### `courses` table
 
-| Field         | Type       | Rules                                            |
-| ------------- | ---------- | ------------------------------------------------ |
-| `id`          | INTEGER PK | Auto-increment                                   |
-| `name`        | STRING     | Required; max 255 chars                          |
-| `number`      | STRING     | Required; (XXXX-####)                            |
-| `description` | STRING     | Required                                         |
-| `semester`    | STRING     | Required; ["Fall", "Winter", "Spring", "Summer"] |
-| `frequency`   | STRING     | Required; ["Yearly", "Even Years", "Odd Years"]  |
-| `hours`       | INTEGER    | Required; multiple of 0.5                        |
-| `deparmtment` | INTEGER    | Required; max 100 chars                          |
-| `createdAt`   | DATE       | Sequelize timestamps                             |
-| `updatedAt`   | DATE       | Sequelize timestamps                             |
+| Field         | Type       | Rules                                           |
+| ------------- | ---------- | ----------------------------------------------- |
+| `id`          | INTEGER PK | Auto-increment                                  |
+| `name`        | STRING     | Required; max 255 chars                         |
+| `number`      | STRING     | Required; (XXXX-####)                           |
+| `description` | STRING     | Required                                        |
+| `semesters`   | STRING     | Required;                                       |
+| `frequency`   | STRING     | Required; ["Yearly", "Even Years", "Odd Years"] |
+| `hours`       | INTEGER    | Required; integer                               |
+| `department`  | STRING     | Required                                        |
+| `createdAt`   | DATE       | Sequelize timestamps                            |
+| `updatedAt`   | DATE       | Sequelize timestamps                            |
 
 ### Associations (in `models/index.js`)
 
@@ -215,7 +216,7 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 #### Scenario: User creates course with missing fields
 
 - **Given** I am signed in as an admin
-- **When** I open the new course dialog and I leave the `courseName` field empty and submit
+- **When** I open the new course dialog and I leave the `name` field empty and submit
 - **Then** inline validation blocks the request I see a required field validation message
 
 #### Scenario: User creates a course with invalid fields
@@ -232,7 +233,7 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 
 - **Given** I am signed in courses exist in the system
 - **When** I navigate to the courses view
-- **Then** the courses appear in the view they are sorted alphabetically by `courseNumber`
+- **Then** the courses appear in the view they are sorted alphabetically by `number`
 
 #### Scenario: Courses empty state
 
@@ -244,7 +245,7 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 
 - **Given** I am signed in as a non-admin user
 - **When** I navigate to the courses view
-- **Then** I see the list of courses I do not see the **+ New Course** button or row actions
+- **Then** I see the list of courses I do not see the **+ New Course** button or the **Course actions** menu
 
 ---
 
@@ -264,19 +265,19 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 
 ---
 
-### US-3.4 — Manage course rows
+### US-3.4 — Manage course cards
 
-#### Scenario: Course rows show edit and delete actions for admins
+#### Scenario: Course cards show edit and delete actions for admins
 
 - **Given** I am signed in as an admin
 - **When** I view the courses view
-- **Then** each course row shows an **Edit course** icon action each course row shows a **Delete course** icon action
+- **Then** each course card shows a **Course actions** button and opening it shows **Edit** and **Delete**
 
-#### Scenario: Course rows do not show edit/delete actions for non-admins
+#### Scenario: Course cards do not show edit/delete actions for non-admins
 
 - **Given** I am signed in as a non-admin user
 - **When** I view the courses view
-- **Then** the **Edit course** and **Delete course** icons are not visible
+- **Then** no **Course actions** button is visible on any card
 
 ---
 
@@ -285,13 +286,13 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 #### Scenario: Admin edits a course
 
 - **Given** I am signed in as an admin a course named `Programming I` exists
-- **When** I click the edit icon on the `Programming I` row I change the semester to `Winter` in the edit dialog and submit
+- **When** I choose **Edit** from the **Course actions** menu on the `Programming I` card I change the semester to `Winter` in the edit dialog and submit
 - **Then** the API returns `200` with the updated course object the courses view reflects the updated semester
 
 #### Scenario: Admin deletes a course
 
 - **Given** I am signed in as an admin a course exists
-- **When** I click the delete icon on the course row and submit
+- **When** I choose **Delete** from the **Course actions** menu on the course card and confirm
 - **Then** the API returns `200` or `204` and the course is removed from the courses view
 
 #### Scenario: Non-admin attempts to edit or delete a course via API
@@ -310,22 +311,22 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 
 ## Test Coverage Map
 
-| Story  | Scenario                                                   | Test file                                                         | Test name                                                    |
-| ------ | ---------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------ |
-| US-3.1 | Admin user creates a new course                            | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Admin user creates a new course`                            |
-| US-3.1 | User creates a course with an empty required field         | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `User creates a course with an empty required field`         |
-| US-3.1 | User creates a course with invalid formatted fields        | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `User creates a course with invalid formatted fields`        |
-| US-3.2 | Courses view loads with existing courses                   | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Courses view loads with existing courses`                   |
-| US-3.2 | User has no courses available                              | `frontend/tests/Courses.test.js`                                  | `User has no courses available`                              |
-| US-3.2 | Non-admin user views courses                               | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Non-admin user views courses`                               |
-| US-3.3 | Admin searches for a specific course                       | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Admin searches for a specific course`                       |
-| US-3.3 | Admin paginates through courses                            | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Admin paginates through courses`                            |
-| US-3.4 | Course rows show edit and delete actions for admins        | `frontend/tests/Courses.test.js`                                  | `Course rows show edit and delete actions for admins`        |
-| US-3.4 | Course rows do not show edit/delete actions for non-admins | `frontend/tests/Courses.test.js`                                  | `Course rows do not show edit/delete actions for non-admins` |
-| US-3.5 | Admin edits a course                                       | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Admin edits a course`                                       |
-| US-3.5 | Admin deletes a course                                     | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Admin deletes a course`                                     |
-| US-3.5 | Non-admin attempts to edit or delete a course via API      | `backend/tests/courses.test.js`                                   | `Non-admin attempts to edit or delete a course via API`      |
-| US-3.5 | Unauthenticated API request to courses                     | `backend/tests/courses.test.js`                                   | `Unauthenticated API request to courses`                     |
+| Story  | Scenario                                                    | Test file                                                         | Test name                                                     |
+| ------ | ----------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------- |
+| US-3.1 | Admin user creates a new course                             | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Admin user creates a new course`                             |
+| US-3.1 | User creates a course with an empty required field          | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `User creates a course with an empty required field`          |
+| US-3.1 | User creates a course with invalid formatted fields         | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `User creates a course with invalid formatted fields`         |
+| US-3.2 | Courses view loads with existing courses                    | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Courses view loads with existing courses`                    |
+| US-3.2 | User has no courses available                               | `frontend/tests/Courses.test.js`                                  | `User has no courses available`                               |
+| US-3.2 | Non-admin user views courses                                | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Non-admin user views courses`                                |
+| US-3.3 | Admin searches for a specific course                        | `frontend/tests/Courses.test.js`                                  | `Admin searches for a specific course`                        |
+| US-3.3 | Admin paginates through courses                             | `frontend/tests/Courses.test.js`                                  | `Admin paginates through courses`                             |
+| US-3.4 | Course cards show edit and delete actions for admins        | `frontend/tests/Courses.test.js`                                  | `Course cards show edit and delete actions for admins`        |
+| US-3.4 | Course cards do not show edit/delete actions for non-admins | `frontend/tests/Courses.test.js`                                  | `Course cards do not show edit/delete actions for non-admins` |
+| US-3.5 | Admin edits a course                                        | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Admin edits a course`                                        |
+| US-3.5 | Admin deletes a course                                      | `backend/tests/courses.test.js`, `frontend/tests/Courses.test.js` | `Admin deletes a course`                                      |
+| US-3.5 | Non-admin attempts to edit or delete a course via API       | `backend/tests/courses.test.js`                                   | `Non-admin attempts to edit or delete a course via API`       |
+| US-3.5 | Unauthenticated API request to courses                      | `backend/tests/courses.test.js`                                   | `Unauthenticated API request to courses`                      |
 
 ---
 
