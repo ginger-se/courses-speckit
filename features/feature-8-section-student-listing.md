@@ -1,4 +1,4 @@
-# Feature: Section Management
+# Feature: Section Student Listing
 
 **Feature ID:** 8
 **Branch pattern:** `feature/8-section-student-listing`
@@ -11,7 +11,7 @@
 
 ## User Stories
 
-### US-3.1: See Students in Sections
+### US-8.1: See Students in Sections
 
 **As a** signed-in admin user  
 **I want to** see which students have enrolled in a each section  
@@ -19,7 +19,7 @@
 
 **Priority:** P1  
 **Independent test:** view the list of students enrolled in a section
-**Acceptance scenarios:** see ### US-3.1 under Acceptance Criteria
+**Acceptance scenarios:** see ### US-8.1 under Acceptance Criteria
 
 ---
 
@@ -91,7 +91,7 @@ No new tables for this feature
 
 ## Acceptance Criteria (Gherkin)
 
-### US-3.1 — See Students in Sections
+### US-8.1 — See Students in Sections
 
 
 #### Scenario: Admin Student Sections list loads
