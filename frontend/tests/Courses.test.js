@@ -239,7 +239,8 @@ describe("Feature 3 — Course Management UI", () => {
     it("User has no courses available", async () => {
       await mountCoursesAs(adminUser, []);
 
-      expect(wrapper.text()).toContain("No courses yet. Create your first course.");
+      expect(wrapper.text()).toContain("No courses yet");
+      expect(wrapper.text()).toContain("Create your first course to get started.");
     });
 
     it("Non-admin user views courses", async () => {
@@ -352,7 +353,8 @@ describe("Feature 3 — Course Management UI", () => {
 
       await waitFor(() => expect(apiClient.delete).toHaveBeenCalledWith(`courses/${programming.id}`));
       await waitFor(() => expect(wrapper.text()).not.toContain("COMP-2100"));
-      expect(wrapper.text()).toContain("No courses yet. Create your first course.");
+      expect(wrapper.text()).toContain("No courses yet");
+      expect(wrapper.text()).toContain("Create your first course to get started.");
     });
   });
 });

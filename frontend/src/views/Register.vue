@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import authServices from "../services/authServices.js";
 import Utils from "../config/utils.js";
 import { emailRules } from "../config/validation.js";
+import { useRequest } from "../composables/useRequest.js";
 
 const router = useRouter();
 const form = ref(null);
@@ -12,8 +13,6 @@ const lastName = ref("");
 const email = ref("");
 const password = ref("");
 const confirmPassword = ref("");
-const loading = ref(false);
-const errorMessage = ref("");
 
 const firstNameRules = [(value) => !!value?.trim() || "First name is required."];
 const lastNameRules = [(value) => !!value?.trim() || "Last name is required."];
@@ -26,32 +25,25 @@ const confirmPasswordRules = [
   (value) => value === password.value || "Passwords do not match.",
 ];
 
-const handleSubmit = async () => {
-  errorMessage.value = "";
+const { data, loading, error, run } = useRequest(authServices.registerUser, { fallback: "Registration failed." });
+
+const submit = async () => {
   const { valid } = await form.value.validate();
+  if (!valid) return;
 
-  if (!valid) {
-    return;
-  }
+  const credentials = {
+    firstName: firstName.value.trim(),
+    lastName: lastName.value.trim(),
+    email: email.value.trim(),
+    password: password.value,
+  };
 
-  loading.value = true;
+  const result = await run(credentials);
+  if (!result) return;
 
-  try {
-    const response = await authServices.registerUser({
-      firstName: firstName.value.trim(),
-      lastName: lastName.value.trim(),
-      email: email.value.trim(),
-      password: password.value,
-    });
-
-    Utils.setStore("user", response.data);
-    window.dispatchEvent(new CustomEvent("user-logged-in"));
-    await router.push({ name: "home" });
-  } catch (error) {
-    errorMessage.value = error.response?.data?.message || "Registration failed.";
-  } finally {
-    loading.value = false;
-  }
+  Utils.setStore("user", data.value);
+  window.dispatchEvent(new CustomEvent("user-logged-in"));
+  await router.push({ name: "home" });
 };
 </script>
 
@@ -63,7 +55,7 @@ const handleSubmit = async () => {
           <v-card-title class="text-h5">Create account</v-card-title>
 
           <v-card-text>
-            <v-form ref="form" @submit.prevent="handleSubmit">
+            <v-form ref="form" @submit.prevent="submit">
               <v-row>
                 <v-col cols="12" md="6">
                   <v-text-field
@@ -119,8 +111,8 @@ const handleSubmit = async () => {
                 </v-col>
               </v-row>
 
-              <v-alert v-if="errorMessage" type="error" density="compact" class="mb-4">
-                {{ errorMessage }}
+              <v-alert v-if="error" type="error" density="compact" class="mb-4">
+                {{ error }}
               </v-alert>
 
               <v-btn type="submit" color="primary" variant="elevated" block :loading="loading"> Create account </v-btn>

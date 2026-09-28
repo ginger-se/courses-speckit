@@ -1,4 +1,5 @@
 <script setup>
+import ConfirmProvider from "./components/common/ConfirmProvider.vue";
 import MenuBar from "./components/MenuBar.vue";
 </script>
 
@@ -8,6 +9,7 @@ import MenuBar from "./components/MenuBar.vue";
     <v-main>
       <router-view />
     </v-main>
+    <ConfirmProvider />
   </v-app>
 </template>
 

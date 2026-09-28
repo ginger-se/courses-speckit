@@ -149,7 +149,7 @@ Only signed-in admin users should be able to manage sections. Other signed-in us
     - **New**: add a list of sections attached to the course. Have a **+ New Section** button and allow the section fields to be edited inline with a **Delete** button on each row.
   - **Delete** icon — opens confirmation `<v-dialog>`
 - Icon-only row actions use `size="small"` and accessible `aria-label`s (**Edit course**, **Delete course**).
-- **Empty state:** **"No courses yet. Create your first course."** when there are no courses.
+- **Empty state:** `<v-empty-state>` titled **"No courses yet"** when there are no courses. Admins see **"Create your first course to get started."** and a **+ New Course** button; non-admins see **"Check back later."**
 - **Loading state:** skeleton or progress indicator while courses are fetching.
 - **Error state:** `<v-alert type="error">` for API failures.
 - **Pagination:** courses are paginated when there are more than 20 rows

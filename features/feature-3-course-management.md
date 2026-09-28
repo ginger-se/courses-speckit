@@ -165,7 +165,7 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
   - **Edit** — opens the course `<v-dialog>` pre-filled with current data; **Save** / **Cancel**
   - **Delete** — opens confirmation `<v-dialog>`
 - Non-admins do not see the **Course actions** button.
-- **Empty state:** **"No courses yet. Create your first course."** when there are no courses.
+- **Empty state:** `<v-empty-state>` titled **"No courses yet"** when there are no courses. Admins see **"Create your first course to get started."** and a **+ New Course** button; non-admins see **"Check back later."**
 - **Loading state:** skeleton or progress indicator while courses are fetching.
 - **Error state:** `<v-alert type="error">` for API failures.
 - **Pagination:** courses are paginated when there are more than 20 courses (20 cards per page)
@@ -237,9 +237,9 @@ Only signed-in admin users should be able to manage courses. Other signed-in use
 
 #### Scenario: Courses empty state
 
-- **Given** I am signed in and there are no courses in the database
+- **Given** I am signed in as an admin and there are no courses in the database
 - **When** I navigate to the courses view
-- **Then** I see **"No courses yet. Create your first course."**
+- **Then** I see **"No courses yet"** and **"Create your first course to get started."**
 
 #### Scenario: Non-admin does not see admin buttons
 
