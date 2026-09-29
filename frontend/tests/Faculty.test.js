@@ -51,6 +51,45 @@ const glen = {
   department: "Computer Science",
 };
 
+const travis = {
+  facultyId: 3,
+  firstName: "Travis",
+  lastName: "Montgomery",
+  department: "English",
+};
+
+const twentyOneFaculty = Array.from({ length: 21 }, (_, index) => ({
+  facultyId: index + 1,
+  firstName: index === 20 ? "TwentyFirst" : `Person${index + 1}`,
+  lastName: "Faculty",
+  department: "Art",
+}));
+
+const setSearch = async (value) => {
+  const input = await waitFor(() => {
+    const field = wrapper.find('input[placeholder="Search faculty..."]');
+    expect(field.exists()).toBe(true);
+    return field;
+  });
+  await input.setValue(value);
+  await settle();
+};
+
+const clickNextPage = async () => {
+  const button = await waitFor(() => {
+    const next =
+      document.body.querySelector('[aria-label="Next page"]') ||
+      document.body.querySelector(".v-pagination__next button") ||
+      [...document.body.querySelectorAll(".v-pagination button")].find((el) =>
+        (el.getAttribute("aria-label") || el.textContent || "").toLowerCase().includes("next"),
+      );
+    expect(next).toBeTruthy();
+    return next;
+  });
+  button.click();
+  await settle();
+};
+
 const tooLong = "a".repeat(256);
 const apiError = (status, message) => Object.assign(new Error(message), { response: { status, data: { message } } });
 
@@ -499,6 +538,71 @@ describe("Feature 4 — Faculty Management UI", () => {
       expect(wrapper.text()).not.toContain("David North");
       expect(namedButton("+ New Faculty")).toBeUndefined();
       expect([...wrapper.findAll("a, button")].some((el) => el.text().trim() === "Faculty")).toBe(false);
+    });
+  });
+
+  describe("US-4.6 — Search/paginate faculty", () => {
+    it("Users can search faculty by last name", async () => {
+      signIn(adminUser);
+      facultyServices.getFaculty.mockResolvedValue({ data: [david, glen] });
+      await mountAppAt("/faculty");
+
+      await setSearch("North");
+
+      await waitFor(() => expect(wrapper.text()).toContain("David North"));
+      expect(wrapper.text()).not.toContain("Glen Davis");
+      expect(facultyServices.getFaculty).toHaveBeenCalledTimes(1);
+    });
+
+    it("Users can search faculty by first name", async () => {
+      signIn(adminUser);
+      facultyServices.getFaculty.mockResolvedValue({ data: [david, glen] });
+      await mountAppAt("/faculty");
+
+      await setSearch("Glen");
+
+      await waitFor(() => expect(wrapper.text()).toContain("Glen Davis"));
+      expect(wrapper.text()).not.toContain("David North");
+      expect(facultyServices.getFaculty).toHaveBeenCalledTimes(1);
+    });
+
+    it("Users can search faculty by department", async () => {
+      signIn(adminUser);
+      facultyServices.getFaculty.mockResolvedValue({ data: [david, glen, travis] });
+      await mountAppAt("/faculty");
+
+      await setSearch("Computer Science");
+
+      await waitFor(() => expect(wrapper.text()).toContain("David North"));
+      expect(wrapper.text()).toContain("Glen Davis");
+      expect(wrapper.text()).not.toContain("Travis Montgomery");
+      expect(facultyServices.getFaculty).toHaveBeenCalledTimes(1);
+    });
+
+    it("No matches for search", async () => {
+      signIn(adminUser);
+      facultyServices.getFaculty.mockResolvedValue({ data: [david, glen] });
+      await mountAppAt("/faculty");
+
+      await setSearch("zzzz");
+
+      await waitFor(() => expect(wrapper.text()).toContain("No matches"));
+      expect(wrapper.text()).not.toContain("David North");
+      expect(wrapper.text()).not.toContain("Glen Davis");
+    });
+
+    it("Faculty list paginates", async () => {
+      signIn(adminUser);
+      facultyServices.getFaculty.mockResolvedValue({ data: twentyOneFaculty });
+      await mountAppAt("/faculty");
+
+      expect(wrapper.text()).toContain("Person1 Faculty");
+      expect(wrapper.text()).not.toContain("TwentyFirst Faculty");
+
+      await clickNextPage();
+
+      await waitFor(() => expect(wrapper.text()).toContain("TwentyFirst Faculty"));
+      expect(wrapper.text()).not.toContain("Person1 Faculty");
     });
   });
 });
