@@ -146,9 +146,8 @@ const handleLogout = async () => {
   <v-app-bar color="primary" density="comfortable">
     <v-app-bar-title>Course Management System</v-app-bar-title>
 
-    <v-btn v-if="user" variant="text" color="white" to="/"
-      >Go to MenuBar.vue to add links here as needed, be sure to hide from normal users if applicable</v-btn
-    >
+    <v-btn v-if="user?.role === 'admin'" variant="text" color="white" to="/faculty"> Faculty </v-btn>
+
     <!-- <v-btn v-if="user?.role === 'admin' || user?.role === 'manager'" variant="text" color="white" to="/teams">
       Teams
     </v-btn>

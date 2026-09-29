@@ -3,6 +3,7 @@ import Utils from "./config/utils.js";
 import Login from "./views/Login.vue";
 import Register from "./views/Register.vue";
 import Home from "./views/Home.vue";
+import Faculty from "./views/Faculty.vue";
 
 const publicRouteNames = new Set(["login", "register"]);
 
@@ -23,6 +24,11 @@ const router = createRouter({
       path: "/",
       name: "home",
       component: Home,
+    },
+    {
+      path: "/faculty",
+      name: "faculty",
+      component: Faculty,
     },
     {
       path: "/:pathMatch(.*)*",
