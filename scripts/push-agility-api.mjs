@@ -13,8 +13,10 @@
  *   node scripts/push-agility-api.mjs --feature 3
  *     Feature push — stories + tests for feature 3 only (uses existing epic by name, or creates that epic).
  *
+ *   node scripts/push-agility-api.mjs --upsert
  *   node scripts/push-agility-api.mjs --feature 3 --upsert
- *     Feature upsert — update existing stories/tests by Reference or Name; create missing items.
+ *     Upsert — match existing epics/stories/tests by Reference, update them in place, create only
+ *     what is missing. Safe to re-run; never duplicates.
  *
  *   node scripts/push-agility-api.mjs --dry-run
  *   node scripts/push-agility-api.mjs --verify
@@ -30,9 +32,12 @@ import { fileURLToPath } from "node:url";
 import { buildBacklog, DEFAULT_PROJECT } from "./agility/backlog-data.mjs";
 import {
   buildFeatureUpsertPlan,
+  executeFeatureUpsert,
   formatUpsertPlanSummary,
+  loadExistingAssets,
   printUpsertPlan,
 } from "./agility/upsert.mjs";
+import { listAssetsWhere } from "./agility/rest-helpers.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
@@ -75,6 +80,7 @@ function parseArgs(argv) {
     project: null,
     featureNums: [],
     upsert: false,
+    verbose: false,
     help: false,
   };
 
@@ -126,10 +132,11 @@ function parseArgs(argv) {
       options.upsert = true;
       continue;
     }
-  }
 
-  if (options.upsert && options.featureNums.length === 0) {
-    throw new Error("--upsert requires --feature N (e.g. --feature 3 --upsert)");
+    if (arg === "--verbose" || arg === "-v") {
+      options.verbose = true;
+      continue;
+    }
   }
 
   for (const featureNum of options.featureNums) {
@@ -148,13 +155,15 @@ Usage:
   node scripts/push-agility-api.mjs [options]
 
 Modes:
-  (default)           Create all epics, then all stories + tests (features 1–5)
+  (default)           Create all epics, then all stories + tests (always creates — re-running duplicates)
   --feature <n>       Stories + tests for feature N only (epic looked up by name; created if missing)
   -f <n>              Shorthand for --feature
-  --upsert            With --feature: update existing stories/tests; create missing (requires --feature)
+  --upsert            Update existing epics/stories/tests (matched by Reference); create only what is
+                      missing. Safe to re-run. Combine with --feature to limit to one feature.
 
 Options:
   --dry-run           Print payloads without calling the API
+  -v, --verbose       With --upsert: list every matched item and print full payloads
   --verify            Count epics/stories in the target project
   --project <name>    Agility Scope name (default: AGILITY_SCOPE or "${DEFAULT_PROJECT}")
   -h, --help          Show this help
@@ -162,6 +171,7 @@ Options:
 Examples:
   npm run agility:push
   npm run agility:push -- --feature 3
+  npm run agility:push -- --upsert
   npm run agility:push -- --feature 3 --upsert
   npm run agility:push:dry-run -- --feature 2 --upsert
   npm run agility:verify
@@ -327,6 +337,7 @@ function buildEpicPayload(feature, scopeRef) {
     AssetType: "Epic",
     Name: feature.epic.name,
     Description: feature.epic.description,
+    Reference: feature.epic.ref,
   };
 }
 
@@ -356,17 +367,11 @@ function countTests(feature) {
   return feature.stories.reduce((total, story) => total + story.tests.length, 0);
 }
 
-async function resolveEpicOid(feature, scopeRef, { createIfMissing }) {
+async function resolveEpicOid(feature, scopeRef) {
   const existingOid = await findEpicOidByName(scopeRef, feature.epic.name);
   if (existingOid) {
     console.log(`  Epic found: ${feature.epic.name} (${existingOid})`);
     return existingOid;
-  }
-
-  if (!createIfMissing) {
-    throw new Error(
-      `Epic "${feature.epic.name}" not found in ${scopeName}. Run a full push or feature push first to create the epic, then use --upsert.`,
-    );
   }
 
   console.log(`  Epic not found — creating: ${feature.epic.name}`);
@@ -395,37 +400,34 @@ async function pushStoriesForFeature(feature, scopeRef, epicOid) {
   console.log(`  Created: ${storyResult.created.length} assets`);
 }
 
-async function upsertStoriesForFeature(feature, scopeRef, epicOid) {
-  const plan = await buildFeatureUpsertPlan(feature, scopeRef, epicOid, restGet);
-  const summary = formatUpsertPlanSummary(plan);
+async function loadUpsertPlans(backlog, scopeRef) {
+  const existing = await loadExistingAssets(restGet, scopeWhereClause(scopeRef));
+  return backlog.features.map((feature) => buildFeatureUpsertPlan(feature, existing));
+}
 
-  console.log(
-    `  Upsert plan: ${summary.storiesCreate} story create, ${summary.storiesUpdate} story update, ` +
-      `${summary.testsCreate} test create, ${summary.testsUpdate} test update`,
-  );
+async function upsertBacklog(backlog, scopeRef) {
+  console.log("Mode: upsert (match by Reference; update existing, create missing)\n");
 
-  if (plan.payloads.length === 0) {
-    console.log("  Nothing to do.");
-    return summary;
+  const plans = await loadUpsertPlans(backlog, scopeRef);
+  const post = (payloads, label) => apiPost("/api/asset", payloads, label);
+  const reloadStories = () =>
+    listAssetsWhere(restGet, "Story", scopeWhereClause(scopeRef), ["Name", "Reference"]);
+
+  for (const plan of plans) {
+    printUpsertPlan(plan, scopeRef, { verbose: cli.verbose });
+    const result = await executeFeatureUpsert(plan, scopeRef, post, reloadStories);
+    console.log(`    → ${result.created} created, ${result.modified} modified`);
   }
-
-  const result = await apiPost("/api/asset", plan.payloads, `Upsert ${feature.epic.name}`);
-
-  console.log(
-    `  Result: ${result.created.length} created, ${result.modified.length} modified`,
-  );
-
-  return summary;
 }
 
 async function countAssetsInScope(assetType, scopeRef) {
   const { ok, text } = await restGet(
-    `/rest-1.v1/Data/${assetType}?sel=Name&where=${encodeURIComponent(scopeWhereClause(scopeRef))}&page=1,0`,
+    `/rest-1.v1/Data/${assetType}?sel=Name&where=${encodeURIComponent(scopeWhereClause(scopeRef))}`,
   );
   if (!ok) {
     return -1;
   }
-  return (text.match(/<Asset /g) || []).length;
+  return Number(text.match(/\btotal="(\d+)"/)?.[1] ?? (text.match(/<Asset /g) || []).length);
 }
 
 async function verifyPush(scopeRef) {
@@ -446,24 +448,21 @@ async function verifyPush(scopeRef) {
 }
 
 async function printUpsertDryRun(backlog, scopeRef) {
-  console.log("DRY RUN — upsert plan (lookups + payloads for /api/asset)\n");
-  console.log("Mode: feature upsert (update existing; create missing)\n");
+  console.log("DRY RUN — upsert plan (live lookups, no writes). + = create, ~ = update\n");
 
-  for (const feature of backlog.features) {
-    const epicOid = await findEpicOidByName(scopeRef, feature.epic.name);
-    if (!epicOid) {
-      console.log(`Feature ${feature.num} — ${feature.epic.name}`);
-      console.log(
-        "  Epic not found — upsert requires an existing epic. Run a feature or full push first.",
-      );
-      console.log("");
-      continue;
-    }
+  const totals = { storiesCreate: 0, testsCreate: 0, testsMoved: 0 };
+  for (const plan of await loadUpsertPlans(backlog, scopeRef)) {
+    printUpsertPlan(plan, scopeRef, { verbose: cli.verbose });
+    const summary = formatUpsertPlanSummary(plan);
+    for (const key of Object.keys(totals)) totals[key] += summary[key];
+  }
 
-    console.log(`  Epic found: ${feature.epic.name} (${epicOid})`);
-    const plan = await buildFeatureUpsertPlan(feature, scopeRef, epicOid, restGet);
-    printUpsertPlan(feature, plan);
-    console.log("");
+  console.log(
+    `\nTotal: ${totals.storiesCreate} stories and ${totals.testsCreate} tests to create, ` +
+      `${totals.testsMoved} tests to move. Everything else updates in place.`,
+  );
+  if (!cli.verbose) {
+    console.log("Only new and moved items are listed; re-run with --verbose for every item and full payloads.");
   }
 }
 
@@ -512,19 +511,12 @@ async function pushFullBacklog(backlog, scopeRef) {
 }
 
 async function pushFeatureBacklog(backlog, scopeRef) {
-  const modeLabel = upsertMode ? "feature upsert" : "feature push";
-  console.log(
-    `Mode: ${modeLabel} — stories + tests for feature(s) ${cli.featureNums.join(", ")}\n`,
-  );
+  console.log(`Mode: feature push — stories + tests for feature(s) ${cli.featureNums.join(", ")}\n`);
 
   for (const feature of backlog.features) {
     console.log(`Feature ${feature.num}: ${feature.epic.name}`);
-    const epicOid = await resolveEpicOid(feature, scopeRef, { createIfMissing: !upsertMode });
-    if (upsertMode) {
-      await upsertStoriesForFeature(feature, scopeRef, epicOid);
-    } else {
-      await pushStoriesForFeature(feature, scopeRef, epicOid);
-    }
+    const epicOid = await resolveEpicOid(feature, scopeRef);
+    await pushStoriesForFeature(feature, scopeRef, epicOid);
     console.log("");
   }
 }
@@ -540,11 +532,12 @@ async function main() {
   }
 
   const backlog = buildBacklog(scopeName, backlogOptions);
-  const modeLabel = featureOnly
-    ? upsertMode
-      ? `feature ${cli.featureNums.join(", ")} upsert (stories + tests)`
-      : `feature ${cli.featureNums.join(", ")} (stories + tests)`
-    : "full backlog (epics + stories + tests)";
+  const target = featureOnly ? `feature ${cli.featureNums.join(", ")}` : "full backlog";
+  const modeLabel = upsertMode
+    ? `${target} upsert (epics + stories + tests)`
+    : featureOnly
+      ? `${target} (stories + tests)`
+      : `${target} (epics + stories + tests)`;
 
   console.log(`Agility push — ${scopeName}`);
   console.log(`  Mode: ${modeLabel}`);
@@ -553,22 +546,27 @@ async function main() {
   );
   console.log("");
 
-  const scopeRef =
-    dryRun && !(upsertMode && baseUrl && accessToken) ? scopeName : await resolveScopeRef();
+  if (dryRun && upsertMode && !(baseUrl && accessToken)) {
+    fail("--upsert --dry-run looks up existing assets; set AGILITY_BASE_URL and AGILITY_ACCESS_TOKEN");
+  }
+
+  const scopeRef = dryRun && !upsertMode ? scopeName : await resolveScopeRef();
 
   if (dryRun) {
-    if (upsertMode && baseUrl && accessToken) {
+    if (upsertMode) {
       await printUpsertDryRun(backlog, scopeRef);
     } else {
       printDryRun(backlog, scopeRef, featureOnly);
+      console.log("\nSet AGILITY_BASE_URL and AGILITY_ACCESS_TOKEN, then re-run without --dry-run.");
     }
-    console.log("\nSet AGILITY_BASE_URL and AGILITY_ACCESS_TOKEN, then re-run without --dry-run.");
     return;
   }
 
   console.log(`Scope resolved: ${scopeRef}`);
 
-  if (featureOnly) {
+  if (upsertMode) {
+    await upsertBacklog(backlog, scopeRef);
+  } else if (featureOnly) {
     await pushFeatureBacklog(backlog, scopeRef);
   } else {
     await pushFullBacklog(backlog, scopeRef);

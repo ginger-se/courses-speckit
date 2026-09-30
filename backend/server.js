@@ -34,13 +34,15 @@ app.use(
   cors({
     origin: "http://localhost:8082",
     credentials: true,
-  })
+  }),
 );
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/api", routes);
+const API_PREFIX = process.env.NODE_ENV === "production" ? "/course-t1" : "/api";
+
+app.use(API_PREFIX, routes);
 
 const PORT = process.env.PORT || 3200;
 

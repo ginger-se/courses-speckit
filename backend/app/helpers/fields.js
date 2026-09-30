@@ -9,6 +9,15 @@ export const requiredText = (value) => {
   return String(value).trim();
 };
 
+export const requiredInt = (value) => {
+  // regex instead of parseInt() on purpose
+  if (value === undefined || value === null || !/^\d+$/.test(value)) {
+    return null;
+  }
+
+  return Number(value);
+};
+
 export const parseId = (value) => {
   const parsed = parseInt(value, 10);
   return Number.isNaN(parsed) ? null : parsed;
