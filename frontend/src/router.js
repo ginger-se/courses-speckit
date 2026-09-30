@@ -4,6 +4,7 @@ import Login from "./views/Login.vue";
 import Register from "./views/Register.vue";
 import Home from "./views/Home.vue";
 import Faculty from "./views/Faculty.vue";
+import Courses from "./views/Courses.vue";
 
 const publicRouteNames = new Set(["login", "register"]);
 
@@ -23,7 +24,7 @@ const router = createRouter({
     {
       path: "/",
       name: "home",
-      component: Home,
+      component: Courses,
     },
     {
       path: "/faculty",

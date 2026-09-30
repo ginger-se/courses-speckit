@@ -56,6 +56,16 @@
 **Independent test:** Student `GET /api/faculty` returns `403`; guest UI goes to login
 **Acceptance scenarios:** see ### US-4.5 under Acceptance Criteria
 
+### US-4.6: Search/paginate faculty
+
+**As a** signed-in admin user  
+**I want to** search the list of faculty and page through results
+**So that** I can find the faculty I am looking for
+
+**Priority:** P2  
+**Independent test:** Faculty view can be searched for first name, last name, or department and only matching cards show. With 21 faculty, page 2 shows the leftover row.
+**Acceptance scenarios:** see ### US-4.6 under Acceptance Criteria
+
 ---
 
 ## Requirements
@@ -522,6 +532,49 @@ All endpoints return data **only to the authenticated admin user**. Student-user
 
 ---
 
+### US-4.6 — Search/paginate faculty
+
+#### Scenario: Users can search faculty by last name
+
+- **Given** I am viewing the faculty list
+- **And** Faculty `David North` and a faculty `Glen Davis` exist
+- **When** I type `North` into the search field
+- **Then** the view updates to show `David North`
+- **And** `Glen Davis` is not in the view
+
+#### Scenario: Users can search faculty by first name
+
+- **Given** I am viewing the faculty list
+- **And** Faculty `David North` and a faculty `Glen Davis` exist
+- **When** I type `Glen` into the search field
+- **Then** the view updates to show `Glen Davis`
+- **And** `David North` is not in the view
+
+#### Scenario: Users can search faculty by department
+
+- **Given** I am viewing the faculty list
+- **And** Faculty `David North` and `Glen Davis` with department `Computer Science` exist 
+- **And** Faculty `Travis Montgomery` with department `English` exists
+- **When** I type `Computer Science` into the search field
+- **Then** the view updates to show `David North` and `Glen Davis`
+- **And** `Travis Montgomery` is not in the view
+
+#### Scenario: No matches for search
+
+- **Given** I am viewing the faculty list
+- **And** There are no faculty with first name, last name, or department with `zzzz`
+- **When** I type `zzzz` into the search field
+- **Then** the view updates to show "No results."
+- **And** No faculty appear in the view
+
+#### Scenario: Faculty list paginates
+
+- **Given** there are 21 faculty
+- **When** I click the next page button
+- **Then** the view updates to show the 21st faculty
+
+---
+
 ## Test Coverage Map
 
 Each scenario above must map to at least one automated test. Paths below are **intended** files; tests are not written yet.
@@ -564,6 +617,11 @@ Each scenario above must map to at least one automated test. Paths below are **i
 | US-4.5 | Unauthenticated user tries to access the faculty view | `frontend/tests/Faculty.test.js` | `it("Unauthenticated user tries to access the faculty view")` |
 | US-4.5 | Unauthenticated API request to faculty | `backend/tests/faculty.test.js` | `it("Unauthenticated API request to faculty")` |
 | US-4.5 | User with student role cannot open the faculty view | `frontend/tests/Faculty.test.js` | `it("User with student role cannot open the faculty view")` |
+| US-4.6 | Users can search faculty by last name | `frontend/tests/Faculty.test.js` | `it("Users can search faculty by last name")` |
+| US-4.6 | Users can search faculty by first name | `frontend/tests/Faculty.test.js` | `it("Users can search faculty by first name")` |
+| US-4.6 | Users can search faculty by department | `frontend/tests/Faculty.test.js` | `it("Users can search faculty by department")` |
+| US-4.6 | No matches for search | `frontend/tests/Faculty.test.js` | `it("No matches for search")` |
+| US-4.6 | Faculty list paginates | `frontend/tests/Faculty.test.js` | `it("Faculty list paginates")` |
 
 ---
 

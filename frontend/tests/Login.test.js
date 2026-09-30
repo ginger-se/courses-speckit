@@ -79,6 +79,8 @@ const readStoredUser = () => JSON.parse(localStorage.getItem("user"));
 beforeEach(() => {
   localStorage.clear();
   vi.resetAllMocks();
+  // Tests that land on the home page load courses; give them an empty list
+  apiClient.get.mockResolvedValue({ data: [] });
 });
 
 afterEach(() => {

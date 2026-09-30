@@ -11,7 +11,7 @@
 
 ## User Stories
 
-### US-3.1: Create sections
+### US-5.1: Create sections
 
 **As a** signed-in admin user  
 **I want to** create sections for a course
@@ -19,9 +19,9 @@
 
 **Priority:** P1  
 **Independent test:** Open add-section dialog, create a section; it appears in the sections view  
-**Acceptance scenarios:** see ### US-3.1 under Acceptance Criteria
+**Acceptance scenarios:** see ### US-5.1 under Acceptance Criteria
 
-### US-3.2: View sections
+### US-5.2: View sections
 
 **As a** signed-in user  
 **I want to** see all of the sections for a course  
@@ -29,9 +29,9 @@
 
 **Priority:** P1  
 **Independent test:** Course details view loads a single list of sections  
-**Acceptance scenarios:** see ### US-3.2 under Acceptance Criteria
+**Acceptance scenarios:** see ### US-5.2 under Acceptance Criteria
 
-### US-3.3: Manage section rows
+### US-5.3: Manage section rows
 
 **As a** signed-in admin user  
 **I want** each section row field should be editable and have **delete** action
@@ -39,9 +39,9 @@
 
 **Priority:** P1  
 **Independent test:** Each section row exposes edit and delete icon actions  
-**Acceptance scenarios:** see ### US-3.3 under Acceptance Criteria
+**Acceptance scenarios:** see ### US-5.3 under Acceptance Criteria
 
-### US-3.4: Edit and delete sections
+### US-5.4: Edit and delete sections
 
 **As a** signed-in admin user  
 **I want to** edit or delete a section  
@@ -49,7 +49,7 @@
 
 **Priority:** P2  
 **Independent test:** Edit and delete sections from row actions; sections view updates  
-**Acceptance scenarios:** see ### US-3.5 under Acceptance Criteria
+**Acceptance scenarios:** see ### US-5.4 under Acceptance Criteria
 
 ---
 
@@ -149,7 +149,7 @@ Only signed-in admin users should be able to manage sections. Other signed-in us
     - **New**: add a list of sections attached to the course. Have a **+ New Section** button and allow the section fields to be edited inline with a **Delete** button on each row.
   - **Delete** icon — opens confirmation `<v-dialog>`
 - Icon-only row actions use `size="small"` and accessible `aria-label`s (**Edit course**, **Delete course**).
-- **Empty state:** **"No courses yet. Create your first course."** when there are no courses.
+- **Empty state:** `<v-empty-state>` titled **"No courses yet"** when there are no courses. Admins see **"Create your first course to get started."** and a **+ New Course** button; non-admins see **"Check back later."**
 - **Loading state:** skeleton or progress indicator while courses are fetching.
 - **Error state:** `<v-alert type="error">` for API failures.
 - **Pagination:** courses are paginated when there are more than 20 rows
@@ -188,7 +188,7 @@ Only signed-in admin users should be able to manage sections. Other signed-in us
 
 ## Acceptance Criteria (Gherkin)
 
-### US-3.1 — Create sections
+### US-5.1 — Create sections
 
 #### Scenario: Admin creates section
 
@@ -216,7 +216,7 @@ Only signed-in admin users should be able to manage sections. Other signed-in us
 
 ---
 
-### US-3.2 — View sections
+### US-5.2 — View sections
 
 #### Scenario: Sections view lists sections
 
@@ -232,7 +232,7 @@ Only signed-in admin users should be able to manage sections. Other signed-in us
 
 ---
 
-### US-3.3 — Manage section rows
+### US-5.3 — Manage section rows
 
 #### Scenario: Section rows are editable and have a delete action for admins
 
@@ -248,7 +248,7 @@ Only signed-in admin users should be able to manage sections. Other signed-in us
 
 ---
 
-### US-3.4 — Edit and delete sections
+### US-5.4 — Edit and delete sections
 
 #### Scenario: Admin edits a section
 
