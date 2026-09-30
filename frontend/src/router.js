@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from "vue-router";
 import Utils from "./config/utils.js";
 import Login from "./views/Login.vue";
 import Register from "./views/Register.vue";
-import Home from "./views/Home.vue";
 import Faculty from "./views/Faculty.vue";
 import Courses from "./views/Courses.vue";
 
