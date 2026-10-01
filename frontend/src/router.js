@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import Utils from "./config/utils.js";
 import Login from "./views/Login.vue";
 import Register from "./views/Register.vue";
+import Faculty from "./views/Faculty.vue";
 import Courses from "./views/Courses.vue";
 
 const publicRouteNames = new Set(["login", "register"]);
@@ -25,6 +26,11 @@ const router = createRouter({
       component: Courses,
     },
     {
+      path: "/faculty",
+      name: "faculty",
+      component: Faculty,
+    },
+    {
       path: "/:pathMatch(.*)*",
       redirect: { name: "home" },
     },
@@ -41,6 +47,11 @@ router.beforeEach((to, _from, next) => {
   }
 
   if (user && isPublicRoute) {
+    next({ name: "home" });
+    return;
+  }
+
+  if (user && user.role !== "admin" && to.name === "faculty") {
     next({ name: "home" });
     return;
   }
