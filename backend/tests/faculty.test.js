@@ -305,7 +305,7 @@ describe("Feature 4 — Faculty Management API", () => {
 
       const response = await request(app).get("/api/faculty").set(student);
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(401);
       expect(response.body).toEqual({ message: "Admin role required." });
       expect(JSON.stringify(response.body)).not.toContain("David");
     });
@@ -315,7 +315,7 @@ describe("Feature 4 — Faculty Management API", () => {
 
       const response = await createFaculty(student);
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(401);
       expect(response.body).toEqual({ message: "Admin role required." });
       expect(await db.faculty.count()).toBe(0);
     });
@@ -330,7 +330,7 @@ describe("Feature 4 — Faculty Management API", () => {
         .set(student)
         .send(facultyBody({ firstName: "Bob" }));
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(401);
       expect(response.body).toEqual({ message: "Admin role required." });
       const stored = await db.faculty.findByPk(created.body.facultyId);
       expect(stored.firstName).toBe("David");
@@ -343,7 +343,7 @@ describe("Feature 4 — Faculty Management API", () => {
 
       const response = await request(app).delete(`/api/faculty/${created.body.facultyId}`).set(student);
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(401);
       expect(response.body).toEqual({ message: "Admin role required." });
       expect(await db.faculty.count()).toBe(1);
     });
