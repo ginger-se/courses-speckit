@@ -276,6 +276,28 @@ Only signed-in admin users may create, edit, or delete semesters. Any signed-in 
 
 ---
 
+## Test Coverage Map
+
+| Story | Scenario | Test file | Test name |
+|-------|----------|-----------|-----------|
+| US-2.1 | Admin creates semester | `frontend/tests/Semesters.test.js` | `Admin creates semester` |
+| US-2.1 | Admin saves semester | `backend/tests/semesters.test.js` | `Admin saves semester` |
+| US-2.1 | Admin saves semester | `frontend/tests/Semesters.test.js` | `Admin saves semester` |
+| US-2.1 | User creates semester with missing fields | `backend/tests/semesters.test.js` | `User creates semester with missing fields` |
+| US-2.1 | User creates semester with missing fields | `frontend/tests/Semesters.test.js` | `User creates semester with missing fields` |
+| US-2.1 | User creates a semester with an end date before the start date | `backend/tests/semesters.test.js` | `User creates a semester with an end date before the start date` |
+| US-2.1 | User creates a semester with an end date before the start date | `frontend/tests/Semesters.test.js` | `User creates a semester with an end date before the start date` |
+| US-2.2 | Semesters view lists semesters | `frontend/tests/Semesters.test.js` | `Semesters view lists semesters` |
+| US-2.2 | Semesters empty state | `frontend/tests/Semesters.test.js` | `Semesters empty state` |
+| US-2.3 | Semester rows have edit and delete actions for admins | `frontend/tests/Semesters.test.js` | `Semester rows have edit and delete actions for admins` |
+| US-2.3 | Semester rows do not show edit or delete actions for non-admins | `frontend/tests/Semesters.test.js` | `Semester rows do not show edit or delete actions for non-admins` |
+| US-2.4 | Admin edits a semester | `backend/tests/semesters.test.js` | `Admin edits a semester` |
+| US-2.4 | Admin edits a semester | `frontend/tests/Semesters.test.js` | `Admin edits a semester` |
+| US-2.4 | Admin deletes a semester | `backend/tests/semesters.test.js` | `Admin deletes a semester` |
+| US-2.4 | Admin deletes a semester | `frontend/tests/Semesters.test.js` | `Admin deletes a semester` |
+| US-2.4 | Non-admin attempts to edit or delete a semester via API | `backend/tests/semesters.test.js` | `Non-admin attempts to edit or delete a semester via API` |
+| US-2.4 | Unauthenticated API request to semesters | `backend/tests/semesters.test.js` | `Unauthenticated API request to semesters` |
+
 ## Definition of Done
 
 - [ ] Backend and frontend implemented per this spec (**FR-001**–**FR-004** satisfied)
