@@ -4,6 +4,7 @@ import userModel from "./user.model.js";
 import sessionModel from "./session.model.js";
 import facultyModel from "./faculty.model.js";
 import courseModel from "./course.model.js";
+import semesterModel from "./semester.model.js";
 
 const db = {};
 db.Sequelize = Sequelize;
@@ -14,6 +15,7 @@ db.user = userModel(sequelize, Sequelize);
 db.session = sessionModel(sequelize, Sequelize);
 db.faculty = facultyModel(sequelize, Sequelize);
 db.course = courseModel(sequelize, Sequelize);
+db.semester = semesterModel(sequelize, Sequelize);
 
 db.user.hasMany(db.session, {
   foreignKey: "userId",
