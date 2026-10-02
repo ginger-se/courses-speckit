@@ -9,9 +9,10 @@ import { useConfirm } from "../../composables/useConfirm.js";
 const sectionList = defineModel({ type: Object, required: true });
 const props = defineProps({
   courseId: { type: Number, default: null },
-  faculty: {tpye: Object, default: null},
+  faculty: {type: Object, default: null},
   semesters: {tpye: Object, default: null}
 });
+const rowSaved = ref();
 const page = ref(1)
 const required = (label) => (v) =>
   (Array.isArray(v) ? v.length > 0 : !!String(v ?? "").trim()) || `${label} is required.`;
@@ -20,12 +21,22 @@ const oneOf = (options, label) => (v) =>
   [v].flat().every((x) => options.includes(x)) || `${label} must be one of ${options.join(", ")}.`;
 
 const rules = {
-  name: [required("Name"), (v) => v?.trim().length <= 255 || "Name must be 255 characters or fewer."],
-  number: [
-    required("Course number"),
-    (v) => /^[A-Z]{4}-\d{4}$/.test(v) || "Number must be in the format XXXX-#### (ex. COMP-1234).",
+  sectionNumber: [
+    required("Section number"),
+    (v) => /^[A-Z]{4}-\d{4}-\d{2}$/.test(v) || "Number must be in the format XXXX-####-## (ex. COMP-1234-89).",
   ],
+  semesterId: [required("Semester")],
+  facultyFacultyId: [required("Faculty")],
+  startTime: [required("Start Time")],
+  endTime: [required("End Time")],
+  daysOfWeek: [required("Days")],
 };
+
+function isValid(section){
+    return Object.entries(rules).every(([field, fieldRules]) =>
+        fieldRules.every((rule) => rule(section[field]) === true)
+      );
+}
 
 function addSection(){
     let newSection = {
@@ -55,21 +66,26 @@ const {
   run: updateSection
 } = useRequest(sectionServices.updateSection, {initial: [], fallback: "Failed to update section."});
 
-function save(section){
+async function save(section, index){
     if(section.sectionNumber == null || section.startTime == null || section.endTime == null || section.semesterId == null || section.facultyFacultyId == null || section.daysOfWeek == null )
         return;
+    if (!isValid(section)) {console.log("here");return;}
     if(section.id == null){
         console.log(props.courseId);
-        createSection(section);
+        await createSection(section);
         const index = sectionList.value.findIndex(item => item.sectionNumber === section.sectionNumber)
   
         if (index !== -1) {
             // Replace the entire object at that index
-            sectionList.value[index] = newSection;
+            sectionList.value[index] = newSection.value;
         }
     }else {
         updateSection(section.id, section);
     }
+    rowSaved.value = index;
+    setTimeout(() => {
+        rowSaved.value = undefined;
+    }, 500);
 }
 
 const confirmDelete = useConfirm();
@@ -104,6 +120,7 @@ const deleteSection = async (section, index) => {
       </v-btn>
   </div>
   <v-defaults-provider :defaults="{ global: { density: 'comfortable' } }">
+    <v-card-text v-if="sectionList.length < 1">No sections yet. Create your first section.</v-card-text>
     <v-data-iterator :items="sectionList" :page="page" :items-per-page="3">
         <template v-slot:default="{ items }">
             <template
@@ -111,26 +128,26 @@ const deleteSection = async (section, index) => {
             :key="index"
             :section="section"
             >
-            <v-row @focusout="save(section.raw)">
+            <v-row @focusout="save(section.raw, index)" class="" :class="{saved: rowSaved == index}">
                 <v-col cols="2">
                     <v-text-field
                         :model-value="section.raw.sectionNumber"
                         label="Number"
-                        hint="e.g. COMP-1234"
+                        hint="e.g. COMP-1234-21"
                         :rules="rules.sectionNumber"
                         @update:model-value="section.raw.sectionNumber = $event.toUpperCase()"
                     />
                 
             </v-col>
-            <v-col cols="2">
+            <v-col cols="1/8">
                 <v-text-field v-model="section.raw.startTime" type="" label="Start Time" :rules="rules.startTime"  hint="e.g. 12:30pm" />
                 
             </v-col>
-            <v-col cols="2">
+            <v-col cols="1/8">
 
                 <v-text-field v-model="section.raw.endTime" type="" label="End Time" :rules="rules.endTime" hint="e.g. 12:30pm"/>
             </v-col>
-            <v-col cols="2">
+            <v-col cols="5/24">
 
                 <v-select
                 v-model="section.raw.semesterId"
@@ -138,11 +155,11 @@ const deleteSection = async (section, index) => {
                 :items="props.semesters"
                 item-title="firstName"
                 item-value="facultyId"
-                :rules="rules.semesters"
+                :rules="rules.semesterId"
                 chips   
                 />
             </v-col>
-            <v-col cols="2">
+            <v-col cols="5/24">
                 
                 <v-select
                 v-model="section.raw.facultyFacultyId"
@@ -150,15 +167,15 @@ const deleteSection = async (section, index) => {
                 :items="props.faculty"
                 :item-title="item => `${item.firstName} ${item.lastName}`"
                 item-value="facultyId"
-                :rules="rules.faculty"
+                :rules="rules.facultyFacultyId"
                 chips
                 />
             </v-col>
-            <v-col cols="1">
+            <v-col cols="1/10">
 
-                <v-text-field v-model="section.raw.daysOfWeek" label="Days of week" :rules="rules.daysOfWeek" hint="e.g. M,W,F"/>
+                <v-text-field v-model="section.raw.daysOfWeek" label="Days" :rules="rules.daysOfWeek" hint="e.g. M,W,F"/>
             </v-col>
-            <v-col cols="1">
+            <v-col cols="1/20">
 
             <v-list-item
                         title=""
@@ -176,55 +193,11 @@ const deleteSection = async (section, index) => {
             <v-pagination v-model="page" :length="pageCount"></v-pagination>
         </template>
     </v-data-iterator>
-        <!-- <v-row
-            v-for="section in sectionList"
-            :key="section.id"
-            :section="section"
-        >
-            <v-col cols="2">
-                <v-text-field
-                :model-value="section.sectionNumber"
-                label="Number"
-                hint="e.g. COMP-1234"
-                :rules="rules.sectionNumber"
-                @update:model-value="section.sectionNumber = $event.toUpperCase()"
-                />
-                
-            </v-col>
-            <v-col cols="2">
-                <v-text-field v-model="section.startTime" type="" label="Start Time" :rules="rules.startTime"  hint="e.g. 12:30pm" />
-
-            </v-col>
-            <v-col cols="2">
-
-                <v-text-field v-model="section.endTime" type="" label="End Time" :rules="rules.endTime" hint="e.g. 12:30pm"/>
-            </v-col>
-            <v-col cols="2">
-
-                <v-select
-                v-model="section.semesterId"
-                label="Semester"
-                :items="SEMESTERS"
-                :rules="rules.semesters"
-                chips
-                multiple
-                />
-            </v-col>
-            <v-col cols="2">
-
-                <v-select
-                v-model="section.facultyId"
-                label="Professor"
-                :items="Professors"
-                :rules="rules.faculty"
-                chips
-                multiple
-                />
-            </v-col>
-            <v-col cols="2">
-
-                <v-text-field v-model="section.daysOfWeek" label="Days of week" :rules="rules.daysOfWeek" hint="e.g. M,W,F"/>
-            </v-col>
-        </v-row> -->
   </v-defaults-provider>
 </template>
+
+<style>
+.saved {
+    background-color: rgba(34, 187, 51, .3)
+}
+</style>

@@ -50,7 +50,7 @@ watch(open, (isOpen) => {
 </script>
 
 <template>
-  <v-dialog v-model="open" max-width="1200" :persistent="loading">
+  <v-dialog v-model="open" max-width="1000" :persistent="loading">
     <v-form :disabled="loading" @submit.prevent="submit">
       <v-card rounded="lg" :title="title">
 
@@ -68,10 +68,6 @@ watch(open, (isOpen) => {
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" :disabled="loading" @click="open = false">Cancel</v-btn>
-          <v-btn type="submit" color="primary" variant="elevated" class="oc-cta" :loading="loading">
-            {{ submitLabel }}
-          </v-btn>
         </v-card-actions>
       </v-card>
     </v-form>

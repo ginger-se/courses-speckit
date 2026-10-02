@@ -43,8 +43,6 @@ const emit = defineEmits(["edit", "delete"]);
       <div>{{ course.description }}</div>
     </v-card-text>
 
-    <v-divider class="mx-4 mb-1"></v-divider>
-
     <div class="px-4 my-2">
       <div class="d-flex gc-2">
         <v-chip color="primary">{{ course.hours }} hours</v-chip>
@@ -54,5 +52,26 @@ const emit = defineEmits(["edit", "delete"]);
         <v-chip color="green" v-for="semester in course.semesters" :key="semester">{{ semester }}</v-chip>
       </div>
     </div>
+    <v-divider class="mx-4 mb-1"></v-divider>
+    <v-expansion-panels>
+      <v-expansion-panel
+        title="Sections"
+      >
+        <v-expansion-panel-text>
+          <v-card 
+          class="mb-1"
+           v-for="(section, index) in course.sections"
+            :key="index"
+            :section="section" 
+          >
+          <v-card-title>{{ section.sectionNumber }}: {{ section.faculty.firstName }} {{section.faculty.lastName}}</v-card-title>
+          <v-card-subtitle> {{ section.daysOfWeek }}, {{ section.startTime }} - {{ section.endTime }} </v-card-subtitle>
+          <v-card-text>
+            <div>Semester: {{ section.semesterId }}</div>
+          </v-card-text>
+        </v-card>
+      </v-expansion-panel-text > 
+      </v-expansion-panel>
+  </v-expansion-panels>
   </v-card>
 </template>
