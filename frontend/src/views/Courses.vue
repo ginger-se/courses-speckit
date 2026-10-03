@@ -9,6 +9,8 @@ import { courseMatchesQuery } from "../models/courses.js";
 import { usePagination } from "../composables/usePagination.js";
 import { useRequest } from "../composables/useRequest.js";
 import ListState from "../components/common/ListState.vue";
+import facultyServices from "../services/facultyServices.js";
+import semesterServices from "../services/semesterServices.js";
 
 const isAdmin = Utils.getStore("user")?.role === "admin";
 const query = ref("");
@@ -21,6 +23,20 @@ const {
   error,
   run: getCourses,
 } = useRequest(courseServices.getCourses, { initial: [], fallback: "Failed to fetch courses." });
+
+const {
+  data: faculty,
+  loadingFaculty,
+  facultyError,
+  run: getFaculty
+} = useRequest(facultyServices.getFaculty, {initial: [], fallback: "Failed to fetch faculty."});
+
+const {
+  data: semesters,
+  loadingSemesters,
+  semesterError,
+  run: getSemesters
+} = useRequest(semesterServices.getSemesters, {initial: [], fallback: "Failed to fetch semesters."});
 
 const filteredCourses = computed(() => courses.value.filter((course) => courseMatchesQuery(course, query.value)));
 
@@ -57,7 +73,11 @@ const deleteCourse = async (course) => {
   }
 };
 
-onMounted(getCourses);
+onMounted(()=>{
+  getCourses();
+  getFaculty();
+  getSemesters();
+});
 
 watch(query, () => {
   page.value = 1;
@@ -104,6 +124,6 @@ watch(query, () => {
 
     <v-pagination v-if="pageCount > 1" v-model="page" :length="pageCount" class="mt-4" />
 
-    <CourseFormModal v-model="formOpen" :course="editingCourse" :save="saveCourse" />
+    <CourseFormModal v-model="formOpen" :course="editingCourse" :save="saveCourse" :faculty="faculty"  :semesters="semesters"/>
   </v-container>
 </template>

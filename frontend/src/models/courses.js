@@ -10,6 +10,7 @@ export const toFormModel = (course = {}) => ({
   frequency: course.frequency ?? "",
   hours: course.hours ?? 3,
   department: course.department ?? "",
+  sections: course.sections ?? [],
 });
 
 export const toPayload = (form) => ({
