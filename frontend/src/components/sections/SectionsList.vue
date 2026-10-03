@@ -29,7 +29,9 @@ const rules = {
   facultyFacultyId: [required("Faculty")],
   startTime: [required("Start Time")],
   endTime: [required("End Time")],
-  daysOfWeek: [required("Days")],
+  daysOfWeek: [required("Days"),
+    (v) => /^(M|T|W|TH|F)(,(M|T|W|TH|F))*$/.test(v) || "Days must be a comma seperated list of days (ex. M,W,F).",
+  ],
 };
 
 function isValid(section){
@@ -67,8 +69,6 @@ const {
 } = useRequest(sectionServices.updateSection, {initial: [], fallback: "Failed to update section."});
 
 async function save(section, index){
-    if(section.sectionNumber == null || section.startTime == null || section.endTime == null || section.semesterId == null || section.facultyFacultyId == null || section.daysOfWeek == null )
-        return;
     if (!isValid(section)) {console.log("here");return;}
     if(section.id == null){
         console.log(props.courseId);
@@ -116,7 +116,7 @@ const deleteSection = async (section, index) => {
 
       <v-card-title>Course Sections</v-card-title>
       <v-btn @click="addSection()" color="primary" variant="elevated" class="oc-cta">
-                Add Section
+                + New Section
       </v-btn>
   </div>
   <v-defaults-provider :defaults="{ global: { density: 'comfortable' } }">
@@ -153,8 +153,8 @@ const deleteSection = async (section, index) => {
                 v-model="section.raw.semesterId"
                 label="Semester"
                 :items="props.semesters"
-                item-title="firstName"
-                item-value="facultyId"
+                item-title="name"
+                item-value="id"
                 :rules="rules.semesterId"
                 chips   
                 />
@@ -180,6 +180,7 @@ const deleteSection = async (section, index) => {
             <v-list-item
                         title=""
                         class="pt-4"
+                        aria-label="Delete section"
                         prepend-icon="mdi-trash-can"
                         density=""
                         @click="deleteSection(section.raw, index)"

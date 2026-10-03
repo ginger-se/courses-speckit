@@ -14,7 +14,10 @@ exports.findAll = async (req, res) => {
       include: {
         model: db.section,
         as: 'sections',
-        include: {model: db.faculty, as: "faculty"}
+        include: [
+          {model: db.faculty, as: "faculty"},
+          {model: db.semester, as: "semester"}
+        ]
       },
       order: [["number", "ASC"]],
     });

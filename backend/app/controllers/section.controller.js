@@ -1,47 +1,76 @@
 import db from "../models/index.js";
+import { requiredText, requiredInt } from "../helpers/fields.js";
 const Section = db.section;
 const Op = db.Sequelize.Op;
-
+const SECTION_NUMBER_REGEX = /^[A-Z]{4}-\d{4}-\d{2}$/;
+const DAYS_OF_WEEK = /^(M|T|W|TH|F)(,(M|T|W|TH|F))*$/;
 const exports = {};
 // Create and Save a section
 exports.create = async (req, res) => {
   // Validate request
-  if (req.body.sectionNumber === undefined) {
+    const sectionNumber = requiredText(req.body.sectionNumber);
+    const semesterId = requiredInt(req.body.semesterId);
+    const courseId = requiredInt(req.body.courseId);
+    const startTime = requiredText(req.body.startTime);
+    const endTime = requiredText(req.body.endTime);
+    const facultyFacultyId = requiredInt(req.body.facultyFacultyId);
+    const daysOfWeek = requiredText(req.body.daysOfWeek);
+
+    if (!sectionNumber) {
+      return res.status(400).send({
+        message: "Section Number cannot be empty for section!",
+      });
+    } if (!semesterId) {
+      return res.status(400).send({
+        message: "semester cannot be empty for section!",
+      });
+    } if (!courseId) {
+      return res.status(400).send({
+        message: "courseId cannot be empty for section!",
+      });
+    } if (!facultyFacultyId) {
+      return res.status(400).send({
+        message: "facultyId cannot be empty for section!",
+      });
+    }
+     if (!daysOfWeek) {
+      return res.status(400).send({
+        message: "daysOfWeek cannot be empty for section!",
+      });
+    }if (!startTime) {
+      return res.status(400).send({
+        message: "startTime cannot be empty for section!",
+      });
+    }if (!endTime) {
+      return res.status(400).send({
+        message: "daysOfWeek cannot be empty for section!",
+      });
+    }
+      
+   if (!SECTION_NUMBER_REGEX.test(sectionNumber)) {
     return res.status(400).send({
-      message: "Section Number cannot be empty for section!",
+      message: "Section number must be one in the form XXXX-####-## (ex. COMP-1234-01)",
     });
-  } if (req.body.semesterId === undefined) {
+  } if (!DAYS_OF_WEEK.test(daysOfWeek)) {
     return res.status(400).send({
-      message: "semesterId cannot be empty for section!",
-    });
-  } if (req.body.courseId === undefined) {
-    return res.status(400).send({
-      message: "courseId cannot be empty for section!",
-    });
-  } if (req.body.semesterId === undefined) {
-    return res.status(400).send({
-      message: "semesterId cannot be empty for section!",
-    });
-  } if (req.body.facultyFacultyId === undefined) {
-    return res.status(400).send({
-      message: "facultyId cannot be empty for section!",
+      message: "Days of week must be one or more of M, T, W, TH, F (ex. M,T,W,TH,F)",
     });
   }
 
   // Create a section
   const section = {
-    sectionNumber: req.body.sectionNumber,
-    semesterId: req.body.semesterId,
-    courseId: req.body.courseId,
-    facultyFacultyId: req.body.facultyFacultyId,
-    daysOfWeek: req.body?.daysOfWeek,
-    startTime: req.body?.startTime,
-    endTime: req.body?.endTime,
+    sectionNumber: sectionNumber,
+    semesterId: semesterId,
+    courseId: courseId,
+    facultyFacultyId: facultyFacultyId,
+    daysOfWeek: daysOfWeek,
+    startTime: startTime,
+    endTime: endTime,
   };
 
   try {
     const data = await Section.create(section);
-    res.send(data);
+    res.status(201).send(data);
   } catch (err) {
     res.status(500).send({
       message: err.message || "Some error occurred while creating the section.",
@@ -52,7 +81,7 @@ exports.create = async (req, res) => {
 // Retrieve all sectiones
 exports.findAll = async (req, res) => {
   try {
-    const data = await Section.findAll();
+    const data = await Section.findAll({order: [['sectionNumber', 'ASC']]});
     res.send(data);
   } catch (err) {
     res.status(500).send({
@@ -83,6 +112,9 @@ exports.findOne = async (req, res) => {
 
   try {
     const data = await Section.findByPk(id);
+    if (!data) {
+      return res.status(404).send({ message: `section with id=${id} not found.` });
+    }
     res.send(data);
   } catch (err) {
     res.status(500).send({
@@ -94,17 +126,15 @@ exports.findOne = async (req, res) => {
 // Update a section by the id in the request
 exports.update = async (req, res) => {
   const id = req.params.id;
-  const status = await Section.findByPk(id);
+  let section = await Section.findByPk(id);
 
   try {
     const num = await Section.update(req.body, {
       where: { id: id },
     });
     if (num == 1) {
-
-      res.send({
-        message: "section was updated successfully.",
-      });
+      section = await Section.findByPk(id);
+      res.status(200).send(section);
     } else {
       res.send({
         message: `Cannot update section with id=${id}. Maybe section was not found or req.body is empty!`,

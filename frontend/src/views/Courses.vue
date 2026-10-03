@@ -10,6 +10,7 @@ import { usePagination } from "../composables/usePagination.js";
 import { useRequest } from "../composables/useRequest.js";
 import ListState from "../components/common/ListState.vue";
 import facultyServices from "../services/facultyServices.js";
+import semesterServices from "../services/semesterServices.js";
 
 const isAdmin = Utils.getStore("user")?.role === "admin";
 const query = ref("");
@@ -35,7 +36,7 @@ const {
   loadingSemesters,
   semesterError,
   run: getSemesters
-} = useRequest(facultyServices.getFaculty, {initial: [], fallback: "Failed to fetch semesters."});
+} = useRequest(semesterServices.getSemesters, {initial: [], fallback: "Failed to fetch semesters."});
 
 const filteredCourses = computed(() => courses.value.filter((course) => courseMatchesQuery(course, query.value)));
 

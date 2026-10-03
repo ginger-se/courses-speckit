@@ -67,7 +67,7 @@ const emit = defineEmits(["edit", "delete"]);
           <v-card-title>{{ section.sectionNumber }}: {{ section.faculty.firstName }} {{section.faculty.lastName}}</v-card-title>
           <v-card-subtitle> {{ section.daysOfWeek }}, {{ section.startTime }} - {{ section.endTime }} </v-card-subtitle>
           <v-card-text>
-            <div>Semester: {{ section.semesterId }}</div>
+            <div>Semester: {{ section.semester.name }}</div>
           </v-card-text>
         </v-card>
       </v-expansion-panel-text > 
