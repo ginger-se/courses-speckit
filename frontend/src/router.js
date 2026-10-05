@@ -57,7 +57,7 @@ router.beforeEach((to, _from, next) => {
     return;
   }
 
-  if (user && user.role !== "admin" && to.name === "faculty") {
+  if (user && user.role !== "admin" && (to.name === "faculty" || to.name == "semesters")) {
     next({ name: "home" });
     return;
   }
