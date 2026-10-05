@@ -11,6 +11,14 @@ const exports = {};
 exports.findAll = async (req, res) => {
   try {
     const courses = await db.course.findAll({
+      include: {
+        model: db.section,
+        as: 'sections',
+        include: [
+          {model: db.faculty, as: "faculty"},
+          {model: db.semester, as: "semester"}
+        ]
+      },
       order: [["number", "ASC"]],
     });
 

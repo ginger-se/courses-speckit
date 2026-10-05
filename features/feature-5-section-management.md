@@ -66,6 +66,7 @@
 ## Assumptions
 
 - Sections use **dialog-based** workflows (no split sidebar / main panel).
+- Section rows save on **focusout** (not via the course dialog **Save** button).
 
 ## Edge Cases
 
@@ -104,7 +105,7 @@ Only signed-in admin users should be able to manage sections. Other signed-in us
   "sectionNumber": "COMP-2100-01",
   "semesterId": "1",
   "courseId": "2",
-  "facultyId": "3",
+  "facultyFacultyId": "3",
   "daysOfWeek": "M,W,F",
   "startTime": "14:30:00",
   "endTime": "15:30:00",
@@ -119,7 +120,7 @@ Only signed-in admin users should be able to manage sections. Other signed-in us
   "sectionNumber": "COMP-2100-01",
   "semesterId": "1",
   "courseId": "2",
-  "facultyId": "3",
+  "facultyFacultyId": "3",
   "daysOfWeek": "M,W,F",
   "startTime": "14:30:00",
   "endTime": "15:30:00",
@@ -146,7 +147,7 @@ Only signed-in admin users should be able to manage sections. Other signed-in us
 - Secondary action: **Search** input field
 - Display courses as rows (e.g. `<v-list>` or table): each row shows the **course name**, **course number**, **semester**, **frequency**, **hours**, **department** and icon actions:
   - **Edit** icon — opens rename `<v-dialog>` pre-filled with current data; **Save** / **Cancel**
-    - **New**: add a list of sections attached to the course. Have a **+ New Section** button and allow the section fields to be edited inline with a **Delete** button on each row.
+    - **New**: add a list of sections attached to the course. Have a **+ New Section** button and allow the section fields to be edited inline with a **Delete** button on each row. A filled section row is saved when it loses focus (**focusout**).
   - **Delete** icon — opens confirmation `<v-dialog>`
 - Icon-only row actions use `size="small"` and accessible `aria-label`s (**Edit course**, **Delete course**).
 - **Empty state:** `<v-empty-state>` titled **"No courses yet"** when there are no courses. Admins see **"Create your first course to get started."** and a **+ New Course** button; non-admins see **"Check back later."**
@@ -173,7 +174,7 @@ Only signed-in admin users should be able to manage sections. Other signed-in us
 | `id`            | INTEGER PK | Auto-increment                                   |
 | `sectionNumber` | STRING     | Required; (XXXX-####-##)                            |
 | `semesterId`    | INTEGER    | Required                                         |
-| `facultyId`     | INTEGER    |                                                  |
+| `facultyFacultyId` | INTEGER    | Required                                         |
 | `daysOfWeek`    | STRING     |"M,T,W,TH,F"                                      |
 | `startTime`     | STRING     | hh:mm:ss                                         |
 | `endTime`       | STRING     | hh:mm:ss                                         |
@@ -199,19 +200,19 @@ Only signed-in admin users should be able to manage sections. Other signed-in us
 #### Scenario: Admin saves section
 
 - **Given** I am signed in as an admin in the edit course dialogue
-- **When** I submit the course dialoge with a new section filled with sectionNumber = `COMP-2100-01`,
-- **Then** the API returns `201` with a section object `COMP-2100-01` appears in the courses view ordered alphabetically
+- **When** I fill a new section with sectionNumber = `COMP-2100-01` and the section row loses focus
+- **Then** the API returns `201` with a section object and `COMP-2100-01` appears in the sections list ordered alphabetically
 
 #### Scenario: User creates section with missing fields
 
 - **Given** I am signed in as an admin in the edit course dialogue
-- **When** I submit the course dialoge with a section that doesn't have a semester ID.
-- **Then** inline validation blocks the request I see a required field validation message
+- **When** a section row without a semester ID loses focus
+- **Then** inline validation blocks the request and I see a required field validation message
 
 #### Scenario: User creates a section with invalid fields
 
 - **Given** I am signed in as an admin in the edit course dialogue
-- **When** I submit the course dialoge with a section number formatted as `CS210432` instead of `XXXX-####-##`
+- **When** a section row with section number `CS210432` (instead of `XXXX-####-##`) loses focus
 - **Then** the API returns `400` with an invalid format message and an error is displayed
 
 ---
@@ -253,7 +254,7 @@ Only signed-in admin users should be able to manage sections. Other signed-in us
 #### Scenario: Admin edits a section
 
 - **Given** I am signed in as an admin in the edit course dialogue and a section exists with section number `CSMC-3012-01`
-- **When** I change the section number to `CSMC-3012-02 and submit
+- **When** I change the section number to `CSMC-3012-02` and the section row loses focus
 - **Then** the API returns `200` with the updated section object and the sections list reflects the updated section number
 
 #### Scenario: Admin deletes a section
@@ -273,6 +274,25 @@ Only signed-in admin users should be able to manage sections. Other signed-in us
 - **Given** I have no valid session token
 - **When** I request `GET /sections`
 - **Then** the API returns `401` with an unauthorized message
+
+---
+
+## Test Coverage Map
+
+| Story  | Scenario                                                              | Test file                                                           | Test name                                                             |
+| ------ | --------------------------------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| US-5.1 | Admin creates section                                                 | `frontend/tests/Sections.test.js`                                   | `Admin creates section`                                               |
+| US-5.1 | Admin saves section                                                   | `backend/tests/sections.test.js`, `frontend/tests/Sections.test.js` | `Admin saves section`                                                 |
+| US-5.1 | User creates section with missing fields                              | `backend/tests/sections.test.js`, `frontend/tests/Sections.test.js` | `User creates section with missing fields`                            |
+| US-5.1 | User creates a section with invalid fields                            | `backend/tests/sections.test.js`, `frontend/tests/Sections.test.js` | `User creates a section with invalid fields`                          |
+| US-5.2 | Sections view lists sections                                          | `backend/tests/sections.test.js`, `frontend/tests/Sections.test.js` | `Sections view lists sections`                                        |
+| US-5.2 | Sections empty state                                                  | `frontend/tests/Sections.test.js`                                   | `Sections empty state`                                                |
+| US-5.3 | Section rows are editable and have a delete action for admins         | `frontend/tests/Sections.test.js`                                   | `Section rows are editable and have a delete action for admins`       |
+| US-5.3 | Section rows do not show edit/delete actions for non-admins           | `frontend/tests/Sections.test.js`                                   | `Section rows do not show edit/delete actions for non-admins`         |
+| US-5.4 | Admin edits a section                                                 | `backend/tests/sections.test.js`, `frontend/tests/Sections.test.js` | `Admin edits a section`                                               |
+| US-5.4 | Admin deletes a section                                               | `backend/tests/sections.test.js`, `frontend/tests/Sections.test.js` | `Admin deletes a section`                                             |
+| US-5.4 | Non-admin attempts to edit or delete a section via API                | `backend/tests/sections.test.js`                                    | `Non-admin attempts to edit or delete a section via API`              |
+| US-5.4 | Unauthenticated API request to sections                               | `backend/tests/sections.test.js`                                    | `Unauthenticated API request to sections`                             |
 
 ---
 
