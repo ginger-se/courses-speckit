@@ -6,6 +6,7 @@ import facultyModel from "./faculty.model.js";
 import courseModel from "./course.model.js";
 import sectionModel from "./section.model.js"
 import semesterModel from "./semester.model.js"
+import enrollmentModel from "./enrollment.model.js"
 
 const db = {};
 db.Sequelize = Sequelize;
@@ -18,6 +19,7 @@ db.faculty = facultyModel(sequelize, Sequelize);
 db.course = courseModel(sequelize, Sequelize);
 db.section = sectionModel(sequelize, Sequelize);
 db.semester = semesterModel(sequelize, Sequelize);
+db.enrollment = enrollmentModel(sequelize, Sequelize);
 
 db.user.hasMany(db.session, {
   foreignKey: "userId",
@@ -49,4 +51,22 @@ db.section.belongsTo(
 	{as: "faculty"},
 	{foreignKey: {allowNull: false}, onDelete: "CASCADE"}
 )
+db.user.hasMany(db.enrollment, {
+  foreignKey: "studentId",
+  as: "enrollments",
+  onDelete: "CASCADE",
+});
+db.enrollment.belongsTo(db.user, {
+  foreignKey: "studentId",
+  as: "user",
+});
+db.section.hasMany(db.enrollment, {
+  foreignKey: "sectionId",
+  as: "enrollments",
+  onDelete: "CASCADE",
+});
+db.enrollment.belongsTo(db.section, {
+  foreignKey: "sectionId",
+  as: "section",
+});
 export default db;
