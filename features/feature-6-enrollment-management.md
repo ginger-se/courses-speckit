@@ -109,19 +109,23 @@
 
 ## API Requirements
 
-| Method   | Endpoint                      | Auth            | Purpose                        |
-| -------- | ----------------------------- | --------------- | -------------------            |
-| `POST`   | `/api/enrollments`            | Yes - Student   | Enroll the student in a section. |
-| `DELETE` | `/api/enrollments/:enrollmentId` | Yes - Student | Unenroll the student from a section |
-| `GET`    | `/api/enrollments/:studentId` | Yes - Student   | Get student's enrollments  |
+`studentId` is always the signed-in user (`req.user.id`). The client does not send it. Role `admin` is rejected with `404`.
 
+| Method   | Endpoint                      | Auth          | Purpose |
+| -------- | ----------------------------- | ------------- | ------- |
+| `GET`    | `/api/enrollments`            | Yes - Student | List enrollments for the signed-in student |
+| `POST`   | `/api/enrollments`            | Yes - Student | Enroll the signed-in student in a section. If that student already has another section of the same course with the same `semesterId`, delete those enrollments first. |
+| `DELETE` | `/api/enrollments/:sectionId` | Yes - Student | Unenroll the signed-in student from that section |
 
-**Create enrollment request response:** (`201`)
+**Create enrollment request body** (`POST /api/enrollments`):
+
 ```json
 {
   "sectionId": 1
 }
 ```
+
+**Create enrollment success response** (`201`):
 
 ```json
 {
@@ -132,9 +136,16 @@
   "updatedAt": "2026-09-30T00:00:00.000Z"
 }
 ```
-**Delete enrollment request response:** (`204`)
-**Error response:** `{ "message": "Human-readable explanation." }` with appropriate HTTP status.  
-**Not found:** `404` (do not use `403`).
+
+**List enrollments success response** (`200`): an array of the same enrollment objects. Empty list is `200` with `[]`.
+
+**Delete enrollment:** no request body. Success is `204` with no body.
+
+**Error response:** `{ "message": "Human-readable explanation." }` with the HTTP status.
+
+- No session → `401`
+- Missing `sectionId` → `400`
+- Unknown `sectionId`, another student's enrollment, or role `admin` → `404` (do not use `403`)
 
 ---
 
@@ -285,16 +296,16 @@ Each scenario above must map to at least one automated test.
 
 | Story | Scenario | Test file | Test name |
 |-------|----------|-----------|-----------|
-| US-6.1 | Student enrolls in section | `backend/tests/enrollments.test.js`, `frontend/tests/Courses.test.js` | `Student enrolls in section` |
+| US-6.1 | Student enrolls in section | `backend/tests/enrollment.test.js`, `frontend/tests/Courses.test.js` | `Student enrolls in section` |
 | US-6.1 | Student views correct enrollment buttons | `frontend/tests/Courses.test.js` | `Student views correct enrollment buttons` |
-| US-6.1 | user with no session tries to enroll | `backend/tests/enrollments.test.js` | `user with no session tries to enroll` |
-| US-6.2 | Student unenrolls in a section | `backend/tests/enrollments.test.js`, `frontend/tests/Courses.test.js` | `Student unenrolls in a section` |
-| US-6.2 | user with no session tries to unenroll | `backend/tests/enrollments.test.js` | `user with no session tries to unenroll` |
-| US-6.3 | Student enrolls in a second section of the same course and semester | `backend/tests/enrollments.test.js`, `frontend/tests/Courses.test.js` | `Student enrolls in a second section of the same course and semester` |
-| US-6.3 | Student enrolls in the same course in a different semester | `backend/tests/enrollments.test.js`, `frontend/tests/Courses.test.js` | `Student enrolls in the same course in a different semester` |
+| US-6.1 | user with no session tries to enroll | `backend/tests/enrollment.test.js` | `user with no session tries to enroll` |
+| US-6.2 | Student unenrolls in a section | `backend/tests/enrollment.test.js`, `frontend/tests/Courses.test.js` | `Student unenrolls in a section` |
+| US-6.2 | user with no session tries to unenroll | `backend/tests/enrollment.test.js` | `user with no session tries to unenroll` |
+| US-6.3 | Student enrolls in a second section of the same course and semester | `backend/tests/enrollment.test.js`, `frontend/tests/Courses.test.js` | `Student enrolls in a second section of the same course and semester` |
+| US-6.3 | Student enrolls in the same course in a different semester | `backend/tests/enrollment.test.js`, `frontend/tests/Courses.test.js` | `Student enrolls in the same course in a different semester` |
 | US-6.4 | Admin views sections view | `frontend/tests/Courses.test.js` | `Admin views sections view` |
-| US-6.4 | Admin tries to call API for enrollment | `backend/tests/enrollments.test.js` | `Admin tries to call API for enrollment` |
-| US-6.5 | Admin deletes a section | `backend/tests/enrollments.test.js`, `frontend/tests/Courses.test.js` | `Admin deletes a section` |
+| US-6.4 | Admin tries to call API for enrollment | `backend/tests/enrollment.test.js` | `Admin tries to call API for enrollment` |
+| US-6.5 | Admin deletes a section | `backend/tests/enrollment.test.js`, `frontend/tests/Courses.test.js` | `Admin deletes a section` |
 
 ---
 
@@ -318,13 +329,13 @@ Do not implement behavior not in this spec.
 
 ## Definition of Done
 
-- [ ] Backend and frontend implemented per this spec (**FR-00N** satisfied)
-- [ ] **Success Criteria (SC-00N)** met
-- [ ] All mapped tests pass (`npm test`)
-- [ ] Test Coverage Map complete
-- [ ] `features/reference/data-model.md` updated (if schema changed)
-- [ ] `features/reference/api.md` updated (if API changed)
-- [ ] `features/reference/behavior.md` updated (if product rules changed)
+- [x] Backend and frontend implemented per this spec (**FR-00N** satisfied)
+- [x] **Success Criteria (SC-00N)** met
+- [x] All mapped tests pass (`npm test`)
+- [x] Test Coverage Map complete
+- [x] `features/reference/data-model.md` updated (if schema changed)
+- [x] `features/reference/api.md` updated (if API changed)
+- [x] `features/reference/behavior.md` updated (if product rules changed)
 
 ---
 

@@ -2,9 +2,13 @@
 const props = defineProps({
   course: { type: Object, required: true },
   canManage: { type: Boolean, default: false },
+  enrolledSectionIds: { type: Array, default: () => [] },
+  pendingSectionId: { default: null },
 });
 
-const emit = defineEmits(["edit", "delete"]);
+const emit = defineEmits(["edit", "delete", "enroll", "unenroll"]);
+
+const isEnrolled = (section) => props.enrolledSectionIds.includes(section.id);
 </script>
 
 <template>
@@ -68,6 +72,16 @@ const emit = defineEmits(["edit", "delete"]);
           <v-card-subtitle> {{ section.daysOfWeek }}, {{ section.startTime }} - {{ section.endTime }} </v-card-subtitle>
           <v-card-text>
             <div>Semester: {{ section.semester.name }}</div>
+            <v-btn
+              v-if="!canManage"
+              color="primary"
+              variant="elevated"
+              class="oc-cta mt-2"
+              :loading="pendingSectionId === section.id"
+              @click="isEnrolled(section) ? emit('unenroll', section) : emit('enroll', section)"
+            >
+              {{ isEnrolled(section) ? "Unenroll" : "Enroll" }}
+            </v-btn>
           </v-card-text>
         </v-card>
       </v-expansion-panel-text > 

@@ -37,7 +37,21 @@ const course = (overrides = {}) => ({
   ...overrides,
 });
 
+const section = (overrides = {}) => ({
+  id: 11,
+  sectionNumber: "COMP-2100-01",
+  semesterId: 1,
+  daysOfWeek: "M,W,F",
+  startTime: "14:30:00",
+  endTime: "15:30:00",
+  faculty: { firstName: "David", lastName: "North" },
+  semester: { id: 1, name: "Fall 2026" },
+  ...overrides,
+});
+
 const apiError = (status, message) => Object.assign(new Error(message), { response: { status, data: { message } } });
+
+let enrollmentState;
 
 const settle = async () => {
   for (let i = 0; i < 5; i += 1) {
@@ -63,9 +77,39 @@ const waitFor = async (assertion, timeout = 1500) => {
 
 let wrapper;
 
-const mountCoursesAs = async (user, courses = []) => {
+const mountCoursesAs = async (user, courses = [], enrollments = []) => {
   localStorage.setItem("user", JSON.stringify(user));
-  apiClient.get.mockResolvedValue({ data: courses });
+  enrollmentState = {
+    courses,
+    enrollments: enrollments.map((row) => ({ ...row })),
+    onEnroll(sectionId) {
+      this.enrollments = [
+        ...this.enrollments,
+        { id: this.enrollments.length + 1, studentId: user.userId, sectionId },
+      ];
+    },
+  };
+  apiClient.get.mockImplementation((url) => {
+    if (url === "enrollments") return Promise.resolve({ data: enrollmentState.enrollments });
+    if (url === "courses") return Promise.resolve({ data: enrollmentState.courses });
+    return Promise.resolve({ data: [] });
+  });
+  apiClient.post.mockImplementation((url, body) => {
+    if (url === "enrollments") {
+      enrollmentState.onEnroll(body.sectionId);
+      return Promise.resolve({
+        data: { id: 1, studentId: user.userId, sectionId: body.sectionId },
+      });
+    }
+    return Promise.resolve({ data: {} });
+  });
+  apiClient.delete.mockImplementation((url) => {
+    const [resource, id] = String(url).split("/");
+    if (resource === "enrollments") {
+      enrollmentState.enrollments = enrollmentState.enrollments.filter((row) => row.sectionId !== Number(id));
+    }
+    return Promise.resolve({ data: {} });
+  });
   await router.push("/");
   await router.isReady();
   wrapper = mount(App, { attachTo: document.body, global: { plugins: [vuetify, router] } });
@@ -148,6 +192,27 @@ const chooseCardAction = async (index, title) => {
   await menuItem(title).trigger("click");
   await settle();
 };
+
+const openSections = async () => {
+  const title = wrapper.findAll(".v-expansion-panel-title").find((panel) => panel.text().includes("Sections"));
+  expect(title, "Sections panel").toBeDefined();
+  await title.trigger("click");
+  await settle();
+};
+
+const sectionButton = (sectionNumber) => {
+  const title = wrapper.findAll(".v-card-title").find((node) => node.text().includes(sectionNumber));
+  expect(title, sectionNumber).toBeDefined();
+  const card = title.element.closest(".v-card");
+  const button = wrapper
+    .findAllComponents(VBtn)
+    .find((candidate) => card.contains(candidate.element) && /^(Enroll|Unenroll)$/.test(candidate.text().trim()));
+  expect(button, `enrollment button for ${sectionNumber}`).toBeDefined();
+  return button;
+};
+
+const deleteSectionButtons = () =>
+  wrapper.findAllComponents(VListItem).filter((item) => item.attributes("aria-label") === "Delete section");
 
 beforeEach(() => {
   localStorage.clear();
@@ -355,6 +420,152 @@ describe("Feature 3 — Course Management UI", () => {
       await waitFor(() => expect(wrapper.text()).not.toContain("COMP-2100"));
       expect(wrapper.text()).toContain("No courses yet");
       expect(wrapper.text()).toContain("Create your first course to get started.");
+    });
+  });
+});
+
+describe("Feature 6 — Enrollment Management UI", () => {
+  const programmingWith = (sections) => course({ sections });
+
+  describe("US-6.1 — Create Enrollment", () => {
+    it("Student enrolls in section", async () => {
+      const offered = section();
+      await mountCoursesAs(studentUser, [programmingWith([offered])]);
+      await openSections();
+
+      expect(sectionButton(offered.sectionNumber).text().trim()).toBe("Enroll");
+      await sectionButton(offered.sectionNumber).trigger("click");
+
+      await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith("enrollments", { sectionId: offered.id }));
+      await waitFor(() => expect(sectionButton(offered.sectionNumber).text().trim()).toBe("Unenroll"));
+    });
+
+    it("Student views correct enrollment buttons", async () => {
+      const mine = section();
+      const other = section({ id: 12, sectionNumber: "COMP-2100-02" });
+      await mountCoursesAs(studentUser, [programmingWith([mine, other])], [
+        { id: 1, studentId: studentUser.userId, sectionId: mine.id },
+      ]);
+      await openSections();
+
+      expect(sectionButton(mine.sectionNumber).text().trim()).toBe("Unenroll");
+      expect(sectionButton(other.sectionNumber).text().trim()).toBe("Enroll");
+    });
+  });
+
+  describe("US-6.2 — Delete Enrollment", () => {
+    it("Student unenrolls in a section", async () => {
+      const offered = section();
+      await mountCoursesAs(studentUser, [programmingWith([offered])], [
+        { id: 1, studentId: studentUser.userId, sectionId: offered.id },
+      ]);
+      await openSections();
+
+      expect(sectionButton(offered.sectionNumber).text().trim()).toBe("Unenroll");
+      await sectionButton(offered.sectionNumber).trigger("click");
+
+      await waitFor(() => expect(apiClient.delete).toHaveBeenCalledWith(`enrollments/${offered.id}`));
+      await waitFor(() => expect(sectionButton(offered.sectionNumber).text().trim()).toBe("Enroll"));
+    });
+  });
+
+  describe("US-6.3 — One Enrollment per course per semester", () => {
+    it("Student enrolls in a second section of the same course and semester", async () => {
+      const first = section();
+      const second = section({ id: 12, sectionNumber: "COMP-2100-02" });
+      await mountCoursesAs(studentUser, [programmingWith([first, second])], [
+        { id: 1, studentId: studentUser.userId, sectionId: first.id },
+      ]);
+      enrollmentState.onEnroll = (sectionId) => {
+        enrollmentState.enrollments = [{ id: 2, studentId: studentUser.userId, sectionId }];
+      };
+      await openSections();
+
+      await sectionButton(second.sectionNumber).trigger("click");
+
+      await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith("enrollments", { sectionId: second.id }));
+      await waitFor(() => {
+        expect(sectionButton(second.sectionNumber).text().trim()).toBe("Unenroll");
+        expect(sectionButton(first.sectionNumber).text().trim()).toBe("Enroll");
+      });
+    });
+
+    it("Student enrolls in the same course in a different semester", async () => {
+      const fall = section();
+      const spring = section({
+        id: 12,
+        sectionNumber: "COMP-2100-02",
+        semesterId: 2,
+        semester: { id: 2, name: "Spring 2027" },
+      });
+      await mountCoursesAs(studentUser, [programmingWith([fall, spring])], [
+        { id: 1, studentId: studentUser.userId, sectionId: fall.id },
+      ]);
+      await openSections();
+
+      await sectionButton(spring.sectionNumber).trigger("click");
+
+      await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith("enrollments", { sectionId: spring.id }));
+      await waitFor(() => {
+        expect(sectionButton(spring.sectionNumber).text().trim()).toBe("Unenroll");
+        expect(sectionButton(fall.sectionNumber).text().trim()).toBe("Unenroll");
+      });
+    });
+  });
+
+  describe("US-6.4 — Admin users", () => {
+    it("Admin views sections view", async () => {
+      const offered = section();
+      await mountCoursesAs(adminUser, [programmingWith([offered])]);
+      await openSections();
+
+      expect(wrapper.text()).toContain(offered.sectionNumber);
+      expect(wrapper.findAllComponents(VBtn).some((button) => /^(Enroll|Unenroll)$/.test(button.text().trim()))).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("US-6.5 — Section is removed", () => {
+    it("Admin deletes a section", async () => {
+      const removed = section();
+      const kept = section({
+        id: 12,
+        sectionNumber: "COMP-2100-02",
+        semesterId: 2,
+        semester: { id: 2, name: "Spring 2027" },
+      });
+      await mountCoursesAs(studentUser, [programmingWith([removed, kept])], [
+        { id: 1, studentId: studentUser.userId, sectionId: removed.id },
+        { id: 2, studentId: studentUser.userId, sectionId: kept.id },
+      ]);
+      await openSections();
+      expect(sectionButton(removed.sectionNumber).text().trim()).toBe("Unenroll");
+
+      wrapper.unmount();
+      document.body.innerHTML = "";
+      await mountCoursesAs(adminUser, [programmingWith([removed, kept])]);
+      await chooseCardAction(0, "Edit");
+      await waitFor(() => expect(deleteSectionButtons().length).toBeGreaterThan(0));
+      await deleteSectionButtons().at(0).trigger("click");
+      await settle();
+      const confirm = [...document.body.querySelectorAll("button")].find((el) =>
+        /^delete section$/i.test(el.textContent.trim()),
+      );
+      expect(confirm).toBeDefined();
+      confirm.click();
+      await settle();
+      await waitFor(() => expect(apiClient.delete).toHaveBeenCalledWith(`sections/${removed.id}`));
+
+      wrapper.unmount();
+      document.body.innerHTML = "";
+      await mountCoursesAs(studentUser, [programmingWith([kept])], [
+        { id: 2, studentId: studentUser.userId, sectionId: kept.id },
+      ]);
+      await openSections();
+
+      expect(wrapper.text()).not.toContain(removed.sectionNumber);
+      expect(sectionButton(kept.sectionNumber).text().trim()).toBe("Unenroll");
     });
   });
 });
