@@ -13,9 +13,10 @@
 </IfModule>
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /
+  # Must match the production `base` in vite.config.js.
+  RewriteBase /seiv2026/p3/t1/
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /index.html [L]
+  RewriteRule . /seiv2026/p3/t1/index.html [L]
 </IfModule>

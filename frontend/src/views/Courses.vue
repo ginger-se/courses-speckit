@@ -120,6 +120,12 @@ onMounted(() => {
   }
 });
 
+watch(formOpen, (isOpen) => {
+  if (!isOpen) {
+    getCourses();
+  }
+});
+
 watch(query, () => {
   page.value = 1;
 });
