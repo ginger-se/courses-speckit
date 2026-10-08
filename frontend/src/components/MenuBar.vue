@@ -149,7 +149,8 @@ const handleLogout = async () => {
     <v-btn v-if="user?.role === 'admin'" variant="text" color="white" to="/faculty"> Faculty </v-btn>
     <v-btn v-if="user" variant="text" color="white" to="/">Courses</v-btn>
    <v-btn v-if="user?.role == 'admin'" variant="text" color="white" to="/semesters">Semesters</v-btn>
-    
+    <v-btn v-if="user?.role == 'student'" variant="text" color="white" to="/course-listing">Course Listing</v-btn>
+
     <!-- <v-btn v-if="user?.role === 'admin' || user?.role === 'manager'" variant="text" color="white" to="/teams">
       Teams
     </v-btn>

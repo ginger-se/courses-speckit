@@ -2,7 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { toFormModel, toPayload } from "../../models/courses.js";
 import CourseForm from "./CourseForm.vue";
-import SectionsList from "../sections/sectionsList.vue";
+import SectionsList from "../sections/SectionsList.vue";
 import { useRequest } from "../../composables/useRequest.js";
 
 const open = defineModel({ type: Boolean, default: false });
