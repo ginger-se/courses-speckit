@@ -29,15 +29,15 @@ const {
   data: faculty,
   loadingFaculty,
   facultyError,
-  run: getFaculty
-} = useRequest(facultyServices.getFaculty, {initial: [], fallback: "Failed to fetch faculty."});
+  run: getFaculty,
+} = useRequest(facultyServices.getFaculty, { initial: [], fallback: "Failed to fetch faculty." });
 
 const {
   data: semesters,
   loadingSemesters,
   semesterError,
-  run: getSemesters
-} = useRequest(semesterServices.getSemesters, {initial: [], fallback: "Failed to fetch semesters."});
+  run: getSemesters,
+} = useRequest(semesterServices.getSemesters, { initial: [], fallback: "Failed to fetch semesters." });
 
 const {
   data: enrollments,
@@ -109,9 +109,11 @@ const deleteCourse = async (course) => {
   }
 };
 
-onMounted(()=>{
+onMounted(() => {
   getCourses();
-  getFaculty();
+  if (isAdmin) {
+    getFaculty();
+  }
   getSemesters();
   if (!isAdmin) {
     getEnrollments();
@@ -171,6 +173,12 @@ watch(query, () => {
 
     <v-pagination v-if="pageCount > 1" v-model="page" :length="pageCount" class="mt-4" />
 
-    <CourseFormModal v-model="formOpen" :course="editingCourse" :save="saveCourse" :faculty="faculty"  :semesters="semesters"/>
+    <CourseFormModal
+      v-model="formOpen"
+      :course="editingCourse"
+      :save="saveCourse"
+      :faculty="faculty"
+      :semesters="semesters"
+    />
   </v-container>
 </template>

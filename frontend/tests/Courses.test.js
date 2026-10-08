@@ -569,3 +569,108 @@ describe("Feature 6 — Enrollment Management UI", () => {
     });
   });
 });
+
+/**
+ * Feature 8 — Section Student Listing
+ * Spec: features/feature-8-section-student-listing.md
+ */
+describe("Feature 8 — Section Student Listing UI", () => {
+  const enrollment = (index, user) => ({
+    id: index,
+    studentId: 100 + index,
+    sectionId: 11,
+    user: { id: 100 + index, role: "student", ...user },
+  });
+
+  const roster = (count) =>
+    Array.from({ length: count }, (_, i) => {
+      const n = String(i + 1).padStart(2, "0");
+      return enrollment(i + 1, { firstName: `First${n}`, lastName: `Last${n}`, email: `student${n}@example.com` });
+    });
+
+  /** Answer `sections/:id` with the given result; every other GET keeps the mounted behavior. */
+  const stubSectionRequest = (result) => {
+    const fallback = apiClient.get.getMockImplementation();
+    apiClient.get.mockImplementation((url) => (String(url).startsWith("sections/") ? result() : fallback(url)));
+  };
+
+  const mountAdminWithSection = async (offered) => {
+    await mountCoursesAs(adminUser, [course({ sections: [offered] })]);
+    await openSections();
+  };
+
+  const viewStudents = async () => {
+    await buttonIn(wrapper, "View Students").trigger("click");
+    await settle();
+  };
+
+  describe("US-8.1 — See Students in Sections", () => {
+    it("Admin Student Sections list loads", async () => {
+      const offered = section();
+      await mountAdminWithSection(offered);
+
+      // Loading state: hold the request open and expect a progress indicator.
+      let resolveSection;
+      stubSectionRequest(
+        () =>
+          new Promise((resolve) => {
+            resolveSection = resolve;
+          }),
+      );
+      await viewStudents();
+
+      expect(apiClient.get).toHaveBeenCalledWith(`sections/${offered.id}`);
+      expect(document.body.querySelector(".v-skeleton-loader, .v-progress-linear, .v-progress-circular")).not.toBeNull();
+
+      resolveSection({ data: { ...offered, enrollments: roster(25) } });
+      await settle();
+
+      // Heading describes the section; rows show first name, last name, and email.
+      await waitFor(() => expect(pageText()).toContain("student01@example.com"));
+      const dialog = openDialog();
+      expect(dialog.props("modelValue")).toBe(true);
+      const dialogText = () => document.body.querySelector(".v-overlay__content").textContent;
+      expect(dialogText()).toContain("COMP-2100-01: David North");
+      for (const expected of ["First Name", "Last Name", "Email", "First01", "Last01", "student01@example.com"]) {
+        expect(dialogText()).toContain(expected);
+      }
+      expect(dialogText()).not.toContain("No students have enrolled in this section yet.");
+      expect(document.body.querySelector(".v-alert")).toBeNull();
+
+      // Pagination: more than 20 students are split across pages.
+      expect(dialogText()).toContain("student20@example.com");
+      expect(dialogText()).not.toContain("student21@example.com");
+
+      await document.body.querySelector('.v-overlay__content [aria-label="Next page"]').click();
+      await settle();
+
+      await waitFor(() => expect(dialogText()).toContain("student21@example.com"));
+      expect(dialogText()).toContain("student25@example.com");
+      expect(dialogText()).not.toContain("student01@example.com");
+    });
+
+    it("Admin Student Sections list empty", async () => {
+      const offered = section();
+      await mountAdminWithSection(offered);
+      stubSectionRequest(() => Promise.resolve({ data: { ...offered, enrollments: [] } }));
+
+      await viewStudents();
+
+      expect(apiClient.get).toHaveBeenCalledWith(`sections/${offered.id}`);
+      await waitFor(() => expect(pageText()).toContain("No students have enrolled in this section yet."));
+      expect(pageText()).toContain("COMP-2100-01: David North");
+      expect(document.body.querySelector(".v-alert")).toBeNull();
+
+      // Error state: an API failure surfaces an error alert instead of the roster.
+      wrapper.unmount();
+      document.body.innerHTML = "";
+      await mountAdminWithSection(offered);
+      stubSectionRequest(() => Promise.reject(apiError(500, "Could not load section.")));
+
+      await viewStudents();
+
+      await waitFor(() => expect(document.body.querySelector(".v-alert")).not.toBeNull());
+      expect(document.body.querySelector(".v-alert").textContent).toContain("Could not load section.");
+    });
+  });
+});

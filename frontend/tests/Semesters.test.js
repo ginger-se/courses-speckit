@@ -6,8 +6,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import App from "../src/App.vue";
 import router from "../src/router.js";
+import apiClient from "../src/services/services.js";
 import semesterServices from "../src/services/semesterServices.js";
 import { vuetify } from "./testUtils.js";
+
+// Students are redirected to the courses view, which loads through the shared API client.
+vi.mock("../src/services/services.js", () => ({
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+}));
 
 vi.mock("../src/services/semesterServices.js", () => ({
   default: {
@@ -134,6 +140,7 @@ const clickNamed = async (text) => {
 beforeEach(() => {
   localStorage.clear();
   vi.resetAllMocks();
+  apiClient.get.mockResolvedValue({ data: [] });
   semesterServices.getSemesters.mockResolvedValue({ data: [] });
   semesterServices.createSemester.mockResolvedValue({ data: fall });
   semesterServices.updateSemester.mockResolvedValue({ data: { ...fall, name: "Fall 2026 Term" } });
@@ -205,7 +212,7 @@ describe("Feature 2 — Semester Management", () => {
 
   describe("US-2.2 — View semesters", () => {
     it("Semesters view lists semesters", async () => {
-      signIn(studentUser);
+      signIn(adminUser);
       semesterServices.getSemesters.mockResolvedValue({ data: [fall, spring] });
       await mountAppAt("/semesters");
 
@@ -218,7 +225,7 @@ describe("Feature 2 — Semester Management", () => {
     });
 
     it("Semesters empty state", async () => {
-      signIn(studentUser);
+      signIn(adminUser);
       await mountAppAt("/semesters");
 
       await waitFor(() => {
@@ -244,7 +251,9 @@ describe("Feature 2 — Semester Management", () => {
       semesterServices.getSemesters.mockResolvedValue({ data: [fall] });
       await mountAppAt("/semesters");
 
-      await waitFor(() => expect(wrapper.text()).toContain("Fall 2026"));
+      // The router sends students back to the courses view, so no semester rows or actions render.
+      expect(router.currentRoute.value.name).toBe("home");
+      expect(wrapper.text()).not.toContain("Fall 2026");
       expect(document.body.querySelector('[aria-label="Edit semester"]')).toBeNull();
       expect(document.body.querySelector('[aria-label="Delete semester"]')).toBeNull();
       expect(namedButton("+ New Semester")).toBeUndefined();
