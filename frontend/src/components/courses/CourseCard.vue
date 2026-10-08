@@ -1,4 +1,7 @@
 <script setup>
+import { ref } from "vue";
+import SectionStudentModal from "../sections/SectionStudentModal.vue";
+
 const props = defineProps({
   course: { type: Object, required: true },
   canManage: { type: Boolean, default: false },
@@ -7,8 +10,14 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["edit", "delete", "enroll", "unenroll"]);
-
 const isEnrolled = (section) => props.enrolledSectionIds.includes(section.id);
+const sectionModalId = ref(null);
+const sectionModalOpen = ref(false);
+
+const openSectionStudentsModal = (id) => {
+  sectionModalOpen.value = true;
+  sectionModalId.value = id;
+};
 </script>
 
 <template>
@@ -56,36 +65,43 @@ const isEnrolled = (section) => props.enrolledSectionIds.includes(section.id);
         <v-chip color="green" v-for="semester in course.semesters" :key="semester">{{ semester }}</v-chip>
       </div>
     </div>
-    <v-divider class="mx-4 mb-1"></v-divider>
     <v-expansion-panels>
-      <v-expansion-panel
-        title="Sections"
-      >
+      <v-expansion-panel title="Sections">
         <v-expansion-panel-text>
-          <v-card 
-          class="mb-1"
-           v-for="(section, index) in course.sections"
-            :key="index"
-            :section="section" 
-          >
-          <v-card-title>{{ section.sectionNumber }}: {{ section.faculty.firstName }} {{section.faculty.lastName}}</v-card-title>
-          <v-card-subtitle> {{ section.daysOfWeek }}, {{ section.startTime }} - {{ section.endTime }} </v-card-subtitle>
-          <v-card-text>
-            <div>Semester: {{ section.semester.name }}</div>
-            <v-btn
-              v-if="!canManage"
-              color="primary"
-              variant="elevated"
-              class="oc-cta mt-2"
-              :loading="pendingSectionId === section.id"
-              @click="isEnrolled(section) ? emit('unenroll', section) : emit('enroll', section)"
+          <v-card class="mb-1" v-for="(section, index) in course.sections" :key="index" :section="section">
+            <v-card-item
+              :title="`${section.sectionNumber}: ${section.faculty.firstName} ${section.faculty.lastName}`"
+              :subtitle="`${section.daysOfWeek}, ${section.startTime} - ${section.endTime}`"
             >
-              {{ isEnrolled(section) ? "Unenroll" : "Enroll" }}
-            </v-btn>
-          </v-card-text>
-        </v-card>
-      </v-expansion-panel-text > 
+              <template v-slot:append v-if="canManage">
+                <v-btn
+                  color="primary"
+                  variant="tonal"
+                  class="oc-cta mt-2"
+                  @click="() => openSectionStudentsModal(section.id)"
+                >
+                  View Students
+                </v-btn>
+              </template>
+            </v-card-item>
+            <v-card-text>
+              <div>Semester: {{ section.semester.name }}</div>
+              <v-btn
+                v-if="!canManage"
+                color="primary"
+                variant="elevated"
+                class="oc-cta mt-2"
+                :loading="pendingSectionId === section.id"
+                @click="isEnrolled(section) ? emit('unenroll', section) : emit('enroll', section)"
+              >
+                {{ isEnrolled(section) ? "Unenroll" : "Enroll" }}
+              </v-btn>
+            </v-card-text>
+          </v-card>
+        </v-expansion-panel-text>
       </v-expansion-panel>
-  </v-expansion-panels>
+    </v-expansion-panels>
   </v-card>
+
+  <SectionStudentModal v-model="sectionModalOpen" :section-id="sectionModalId" />
 </template>
