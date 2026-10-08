@@ -77,7 +77,10 @@ jobs:
           echo SEQUELIZE_SYNC_ALTER="$SEQUELIZE_SYNC_ALTER" >> .env
 
       - name: Bundle deploy folder
-        run: npm run bundle
+        run:  |
+          npm run bundle
+          cp course-t1-backend.service deploy/
+          ls -la deploy
 
       - name: Deploy to server
         uses: easingthemes/ssh-deploy@main
