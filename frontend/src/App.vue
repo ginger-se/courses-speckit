@@ -1,11 +1,15 @@
 <script setup>
+import ConfirmProvider from "./components/common/ConfirmProvider.vue";
+import MenuBar from "./components/MenuBar.vue";
 </script>
 
 <template>
   <v-app>
+    <MenuBar />
     <v-main>
       <router-view />
     </v-main>
+    <ConfirmProvider />
   </v-app>
 </template>
 

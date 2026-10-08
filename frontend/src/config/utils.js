@@ -20,6 +20,8 @@ const Utils = {
   removeItem(key) {
     localStorage.removeItem(key);
   },
+
+  errorMessage: (error, fallback) => error?.response?.data?.message || error?.message || fallback,
 };
 
 export default Utils;

@@ -3,7 +3,7 @@ import Utils from "../config/utils.js";
 import router from "../router.js";
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.DEV ? "http://localhost:3200/api/" : "/api/",
+  baseURL: import.meta.env.DEV ? "http://localhost:3200/api/" : "/course-t1/",
   withCredentials: true,
 });
 
@@ -34,7 +34,7 @@ apiClient.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default apiClient;

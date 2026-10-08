@@ -65,92 +65,119 @@ export function epicRef(featureNum) {
   return `SK-F${featureNum}-EPIC`;
 }
 
-export function parseUserStories(content) {
-  const stories = [];
-  const storyRegex =
-    /### US-\d+\.(\d+): ([^\n]+)\n\*\*As (?:a|the)\*\* ([^\n]+)\n\*\*I want(?: to)?\*\* ([^\n]+)\n\*\*So that\*\* ([^\n]+)/g;
+const GHERKIN_STEP_RE = /^(Given|When|Then|And|But)\b/i;
+const STORY_ID_RE = /US-(\d+)\.(\d+)/i;
 
-  let match;
-  while ((match = storyRegex.exec(content)) !== null) {
-    stories.push({
-      num: match[1],
-      title: match[2].trim(),
-      asA: match[3].trim(),
-      iWant: match[4].trim(),
-      soThat: match[5].trim(),
-    });
+/** Lines of a `## Heading…` section, up to (not including) the next `## ` heading. */
+function sectionLines(content, headingPrefix) {
+  const lines = content.split("\n");
+  const start = lines.findIndex((line) => line.startsWith(`## ${headingPrefix}`));
+  if (start === -1) {
+    return null;
+  }
+
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((line) => line.startsWith("## "));
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
+/** Strip list bullets (`-`, `*`, `+`, `1.`) and bold markers from a markdown line. */
+function stripMarkdown(line) {
+  return line
+    .replace(/^\s*(?:[-*+]|\d+\.)\s+/, "")
+    .replace(/\*\*/g, "")
+    .trim();
+}
+
+export function parseUserStories(content) {
+  const lines =
+    sectionLines(content, "User Stories") ?? content.split("## Acceptance Criteria")[0].split("\n");
+
+  const stories = [];
+  let current = null;
+
+  for (const line of lines) {
+    // `### US-3.1: Title` (also tolerates `—` / `-` separators)
+    const heading = line.match(/^###\s+US-\d+\.(\d+)\s*[:—–-]\s*(.+)$/);
+    if (heading) {
+      current = { num: heading[1], title: heading[2].trim(), asA: "", iWant: "", soThat: "" };
+      stories.push(current);
+      continue;
+    }
+
+    if (line.startsWith("#")) {
+      current = null;
+      continue;
+    }
+
+    if (!current) {
+      continue;
+    }
+
+    // Blank lines, trailing `  ` line breaks and bold are all optional around these clauses.
+    const text = stripMarkdown(line);
+    const asA = text.match(/^As (?:an?|the)\s+(.+)$/i);
+    const iWant = text.match(/^I want(?: to)?\s+(.+)$/i);
+    const soThat = text.match(/^So that\s+(.+)$/i);
+
+    if (asA && !current.asA) current.asA = asA[1].trim();
+    else if (iWant && !current.iWant) current.iWant = iWant[1].trim();
+    else if (soThat && !current.soThat) current.soThat = soThat[1].trim();
   }
 
   return stories;
 }
 
 export function parseScenarios(content) {
-  const acIndex = content.indexOf("## Acceptance Criteria");
-  if (acIndex === -1) {
+  const lines = sectionLines(content, "Acceptance Criteria");
+  if (!lines) {
     return [];
   }
 
-  const acBlock = content.slice(acIndex);
-  const lines = acBlock.split("\n");
   const scenarios = [];
   let section = "";
   let current = null;
 
   for (const line of lines) {
-    if (line.startsWith("### ") && !line.startsWith("#### ")) {
-      const heading = line.slice(4).trim();
-      if (!heading.startsWith("US-") && !heading.startsWith("`") && !heading.startsWith("[")) {
-        section = heading;
-      } else {
-        section = heading;
-      }
+    const scenarioHeading = line.match(/^#{3,6}\s+Scenario(?: Outline)?:\s*(.+)$/i);
+    if (scenarioHeading) {
+      current = { section, title: scenarioHeading[1].trim(), steps: [] };
+      scenarios.push(current);
       continue;
     }
 
-    if (line.startsWith("#### Scenario: ")) {
-      if (current) {
-        scenarios.push(current);
-      }
-      current = {
-        section,
-        title: line.slice("#### Scenario: ".length).trim(),
-        steps: [],
-      };
+    if (/^###\s/.test(line)) {
+      section = line.replace(/^###\s+/, "").trim();
+      current = null;
       continue;
     }
 
-    if (current && line.startsWith("*")) {
-      current.steps.push(line.replace(/^\*\s*/, "").trim());
+    // Steps may be `- **Given** …`, `*   **Given** …`, or unbulleted; non-Gherkin lines are ignored.
+    const step = stripMarkdown(line);
+    if (current && GHERKIN_STEP_RE.test(step)) {
+      current.steps.push(step);
     }
-  }
-
-  if (current) {
-    scenarios.push(current);
   }
 
   return scenarios;
 }
 
-/** Map each Gherkin scenario to a user story id using the AC ### US-N.n heading. */
+/**
+ * Map each Gherkin scenario to a user story number using the AC `### US-N.n` heading.
+ * Only the story number is used, so a mistyped feature prefix (e.g. `US-3.1` in feature 5) still maps.
+ */
 export function mapScenarioToStory(featureNum, scenario) {
-  const idMatch = scenario.section.match(/US-(\d+)\.(\d+)/i);
-  if (idMatch && Number(idMatch[1]) === featureNum) {
-    return idMatch[2];
-  }
-
-  return "1";
+  return scenario.section.match(STORY_ID_RE)?.[2] ?? "1";
 }
 
 export function formatGherkin(scenario) {
-  return scenario.steps.map((step) => step.replace(/\*\*/g, "")).join("\n");
+  return scenario.steps.join("\n");
 }
 
+/** Expected results are the first `Then` step plus every step after it (And/But continuations). */
 export function formatExpectedResults(scenario) {
-  const thenSteps = scenario.steps
-    .filter((step) => /^Then|^And/i.test(step.replace(/\*\*/g, "")))
-    .map((step) => step.replace(/\*\*/g, ""));
-
-  return thenSteps.length > 0 ? thenSteps.join("\n") : formatGherkin(scenario);
+  const thenIndex = scenario.steps.findIndex((step) => /^Then\b/i.test(step));
+  return thenIndex === -1 ? formatGherkin(scenario) : scenario.steps.slice(thenIndex).join("\n");
 }
 
 function storyDescription(story, feature, ref) {
@@ -220,15 +247,22 @@ export function buildBacklog(project = DEFAULT_PROJECT, options = {}) {
       };
 
       if (!testsByStory.has(usNum)) {
-        testsByStory.set(usNum, []);
+        console.warn(
+          `Warning: ${feature.file} scenario "${scenario.title}" maps to US-${feature.num}.${usNum}, ` +
+            "which has no parsed user story — it will not be pushed.",
+        );
+        continue;
+      }
+      if (scenario.steps.length === 0) {
+        console.warn(`Warning: ${feature.file} scenario "${scenario.title}" has no Given/When/Then steps.`);
       }
       testsByStory.get(usNum).push(test);
-      totalTests += 1;
     }
 
     const featureStories = stories.map((story) => {
       const ref = storyRef(feature.num, story.num);
       totalStories += 1;
+      totalTests += testsByStory.get(story.num).length;
       return {
         ref,
         name: `${storyId(feature.num, story.num)}: ${story.title}`,
