@@ -6,7 +6,7 @@ import courseRoutes from "./course.routes.js";
 import sectionRoutes from "./section.routes.js";
 import semesterRoutes from "./semester.routes.js";
 import enrollmentRoutes from "./enrollment.routes.js";
-import courseListingRoutes from "./courselisting.routes.js";
+import courseListingRoutes from "./courseListing.routes.js";
 
 const router = Router();
 
