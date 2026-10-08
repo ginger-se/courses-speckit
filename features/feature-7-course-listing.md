@@ -48,7 +48,7 @@
 **So that** other users cannot read what courses I am enrolled in
 
 **Priority:** P1  
-**Independent test:** Admin user course listing access redirects to home; `GET /api/course-listing?semesterId` never returns another user's enrolled sections  
+**Independent test:** Admin user course listing access redirects to home; `GET /api/course-listings/:semesterId` never returns another user's enrolled sections  
 **Acceptance scenarios:** see ### US-7.4 under Acceptance Criteria
 
 ## Requirements
@@ -97,7 +97,7 @@ No new table. Only role `student` sees the course listing and semester selection
 
 | Rule               | Requirement                                                                                         |
 | ------------------ | --------------------------------------------------------------------------------------------------- |
-| **Read scope** | `GET /api/course-listing?semesterId=` returns only enrolled sections where `studentId = req.user.id` and the section's `semesterId` is the selected semester. |
+| **Read scope** | `GET /api/course-listings/:semesterId=` returns only enrolled sections where `studentId = req.user.id` and the section's `semesterId` is the selected semester. |
 | **Write scope** | None. This feature does not create, update, or delete enrollments, sections, or courses. |
 | **Create scope** | None. |
 | **UI scope**       | `/course-listing` is student-only. Guests redirect to login. Admin redirects to home. |
@@ -110,7 +110,7 @@ No new table. Only role `student` sees the course listing and semester selection
 | Method | Endpoint          | Auth       | Purpose in this feature                                      |
 | ------ | ----------------- | ---------- | ------------------------------------------------------------ |
 | `GET`  | `/api/semesters` | Yes        | Dropdown options |
-| `GET`  | `/api/course-listing?semesterId=` | Yes - student       | Load enrolled sections for this student that match the selected semester                  |
+| `GET`  | `/api/course-listings/:semesterId=` | Yes - student       | Load enrolled sections for this student that match the selected semester                  |
 
 The client MUST NOT request `/api/course-listing` until `semesterId` is selected.
 
@@ -137,7 +137,7 @@ The client MUST NOT request `/api/course-listing` until `semesterId` is selected
 ```
 
 **Error response:** `{ "message": "Human-readable explanation." }` with appropriate HTTP status.  
-**Forbidden role (admin):** `404`
+**Forbidden role (admin):** `401`
 **Unknown semester:** `404` `{ "message": "Semester with id=${semesterId} not found." }`
 **Invalid semesterId:** `400` `{ "message": "Semester id is invalid." }`
 **Empty enrollments:** `200` with `[]`
@@ -203,16 +203,16 @@ This feature reads (does not write):
 #### Scenario: Signed-in student user opens the course listing
 *   **Given** I am signed in with student role
 *   **When** I navigate to `/course-listing`
-*   **Then** I see a page with a dropdown labeled **"Semester:"** and an empty page with the message **"Select a semester to view courses."**
-*   **And** The dropdown box for **Semester:** is not prefilled with any semester
+*   **Then** I see a page with a dropdown labeled **"Semester"** and an empty page with the message **"Select a semester to view courses."**
+*   **And** The dropdown box for **Semester** is not prefilled with any semester
 *   **And** no request is sent to `GET /api/course-listing`
 
-#### Scenario: Signed-in student user clicks on the **Semester:** dropdown
+#### Scenario: Signed-in student user clicks on the **Semester** dropdown
 *   **Given** I am signed in with student role
 *   **And** I am on the course listing page
 *   **And** I have not yet selected a semester
 *   **And** There exist semesters `Fall 2026` and `Spring 2027`
-*   **When** I click on the dropdown labeled **Semester:**
+*   **When** I click on the dropdown labeled **Semester**
 *   **Then** The dropdown menu expands and shows semesters `Fall 2026` and `Spring 2027`
 
 #### Scenario: No semesters exist
@@ -220,7 +220,7 @@ This feature reads (does not write):
 *   **And** I am on the course listing page
 *   **And** I have not yet selected a semester
 *   **And** There exist no semesters
-*   **When** I click on the dropdown labeled **Semester:**
+*   **When** I click on the dropdown labeled **Semester**
 *   **Then** The dropdown menu has nothing in it
 
 ### US-7.2 — View courses for selected semester
@@ -231,9 +231,9 @@ This feature reads (does not write):
 *   **And** I have not yet selected a semester
 *   **And** There exists a semester `Fall 2026`
 *   **And** I have enrollments for course `CMSC-1200` and `CMSC-1234` in semester `Fall 2026`
-*   **When** I click on the dropdown labeled **Semester:**
+*   **When** I click on the dropdown labeled **Semester**
 *   **And** I select the semester `Fall 2026`
-*   **Then** I see a table with rows `CMSC-1200` and `CMSC-1234`
+*   **Then** I see rows `CMSC-1200` and `CMSC-1234`
 
 #### Scenario: Enrollments are filtered by semester
 *   **Given** I am signed in with student role
@@ -242,17 +242,8 @@ This feature reads (does not write):
 *   **And** I have an enrollment for course `CMSC-1200` in semester `Fall 2026`
 *   **And** I have an enrollment for course `CMSC-1234` in semester `Spring 2027`
 *   **When** I select the semester `Fall 2026`
-*   **Then** I see a table with a row `CMSC-1200` 
-*   **And** `CMSC-1234` does not appear in the table
-
-#### Scenario: Signed-in student user sees correct headings 
-*   **Given** I am signed in with student role
-*   **And** I am on the course listing page
-*   **And** There exists an enrollment connected to this semester
-*   **And** The section connected to this semester has course number `CMSC-1200`, section number `01`, days of week `MWF`, start time `10:00`, and end time `10:50`
-*   **And** The course with id `CMSC-1200` has name `Programming I` and hours `3.00`
-*   **When** I select semester `Fall 2026`
-*   **Then** I see a row with **Section #** `CMSC-1200-01`, **Course** `Programming I`, **Credit Hours** `3.00`, **Days** `MWF`, and **Time** `10:00—10:50`.
+*   **Then** I see a row `CMSC-1200` 
+*   **And** `CMSC-1234` does not appear
 
 #### Scenario: Signed-in student user has no enrollments in selected semester
 *   **Given** I am signed in with student role
@@ -261,7 +252,7 @@ This feature reads (does not write):
 *   **And** I have no enrollments in semester `Fall 2026`
 *   **When** I select the semester `Fall 2026`
 *   **Then** I see the message **"No enrolled courses."**
-*   **And** No enrollments appear in the table
+*   **And** No enrollments appear
 
 ### US-7.3 — Change selected semester
 
@@ -272,8 +263,8 @@ This feature reads (does not write):
 *   **And** I have an enrollment for course `CMSC-1200` in semester `Fall 2026`
 *   **And** I have an enrollment for course `CMSC-1234` in semester `Spring 2027`
 *   **When** I select the semester `Spring 2027`
-*   **Then** I see a table with a row `CMSC-1234` 
-*   **And** `CMSC-1200` does not appear in the table
+*   **Then** I see a row `CMSC-1234` 
+*   **And** `CMSC-1200` does not appear
 
 ### US-7.4 — Private courses only
 
@@ -284,8 +275,8 @@ This feature reads (does not write):
 *   **And** I have an enrollment for course `CMSC-1200` in semester `Fall 2026`
 *   **And** Another student has an enrollment for course `CMSC-1234` in semester `Fall 2026`
 *   **When** I select the semester `Fall 2026`
-*   **Then** I see a table with a row `CMSC-1200` 
-*   **And** `CMSC-1234` does not appear in the table
+*   **Then** I see a row `CMSC-1200` 
+*   **And** `CMSC-1234` does not appear
 
 #### Scenario: Course listing API only lists one student's enrollments
 *   **Given** I am signed in with student role
@@ -293,7 +284,7 @@ This feature reads (does not write):
 *   **And** I have an enrollment for course `CMSC-1200` in semester `Fall 2026` 
 *   **And** Semester `Fall 2026` has id `1`
 *   **And** Another student has an enrollment for course `CMSC-1234` in semester `Fall 2026`
-*   **When** I request `GET /api/course-listing?semesterId=1`
+*   **When** I request `GET /api/course-listings/:semesterId=1`
 *   **Then** The API returns `200`
 *   **And** `CMSC-1200` is in the response
 *   **And** `CMSC-1234` is not in the response
@@ -305,7 +296,7 @@ This feature reads (does not write):
 
 #### Scenario: Unauthenticated API request to course listing
 *   **Given** I have no valid session token
-*   **When** I request `GET /api/course-listing?semesterId=1`
+*   **When** I request `GET /api/course-listings/:semesterId=1`
 *   **Then** the API returns `401` with an `{ "message": "Not Authorized." }`
 
 #### Scenario: User with admin role cannot open the course listing view
@@ -318,18 +309,18 @@ This feature reads (does not write):
 
 #### Scenario: User with admin role cannot fetch courses
 *   **Given** I am signed in as a user with admin role
-*   **When** I request `GET /api/course-listing?semesterId=1`
-*   **Then** I receive `404`
+*   **When** I request `GET /api/course-listings/:semesterId=1`
+*   **Then** I receive `401`
 
 #### Scenario: Unknown semesterId
 *   **Given** I am signed in as a user with student role
 *   **And** A semester with id `999` does not exist
-*   **When** I request `GET /api/course-listing?semesterId=999`
+*   **When** I request `GET /api/course-listings/:semesterId=999`
 *   **Then** I receive `404` with { "message": "Semester with id=999 not found." }
 
 #### Scenario: Bad semesterId
 *   **Given** I am signed in as a user with student role
-*   **When** I request `GET /api/course-listing?semesterId=abc`
+*   **When** I request `GET /api/course-listings/:semesterId=abc`
 *   **Then** I receive `400` with { "message": "Semester id is invalid." }
 
 ---
@@ -345,7 +336,6 @@ Each scenario above must map to at least one automated test. Paths below are **i
 | US-7.1 | No semesters exist | `frontend/tests/CourseListing.test.js` | `it("No semesters exist")` |
 | US-7.2 | Signed-in student user selects a semester | `frontend/tests/CourseListing.test.js` | `it("Signed-in student user selects a semester")` |
 | US-7.2 | Enrollments are filtered by semester | `frontend/tests/CourseListing.test.js` | `it("Enrollments are filtered by semester")` |
-| US-7.2 | Signed-in student user sees correct headings | `frontend/tests/CourseListing.test.js` | `it("Signed-in student user sees correct headings")` |
 | US-7.2 | Signed-in student user has no enrollments in selected semester | `frontend/tests/CourseListing.test.js` | `it("Signed-in student user has no enrollments in selected semester")` |
 | US-7.3 | Signed-in student changes selected semester | `frontend/tests/CourseListing.test.js` | `it("Signed-in student changes selected semester")` |
 | US-7.4 | Enrollments are filtered by student | `frontend/tests/CourseListing.test.js` | `it("Enrollments are filtered by student")` |
